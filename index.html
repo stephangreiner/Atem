@@ -152,6 +152,18 @@
     color: rgba(232,240,248,0.5);
     margin-top: 2px;
   }
+  .rate-line {
+    margin-top: 4px;
+    font-size: 1.05rem;
+    color: rgba(232,240,248,0.8);
+  }
+  .phase-line {
+    margin-top: 14px;
+    font-size: 0.95rem;
+    color: var(--circle-glow);
+    line-height: 1.5;
+  }
+  .phase-line .val { font-weight: 600; }
   .measure-stats {
     margin-top: 18px;
     font-size: 0.85rem;
@@ -194,11 +206,11 @@
 
 <div class="mode-switch">
   <span>Geführt</span>
-  <div class="switch" id="modeSwitch"></div>
+  <div class="switch on" id="modeSwitch"></div>
   <span>Atmung messen</span>
 </div>
 
-<div id="guidedPanel">
+<div id="guidedPanel" class="hidden">
   <div class="stage">
     <div class="ring" id="maxRing"></div>
     <div class="ring" id="minRing"></div>
@@ -216,10 +228,12 @@
   <div class="counter" id="cycleCounter"></div>
 </div>
 
-<div id="measurePanel" class="measure-panel hidden">
+<div id="measurePanel" class="measure-panel">
   <div class="measure-instructions">Lege das Handy flach mit dem Bildschirm nach oben auf deinen Bauch und atme normal weiter.</div>
-  <div class="bpm-display" id="bpmDisplay">–</div>
-  <div class="bpm-unit">Atemzüge / Min</div>
+  <div class="bpm-display" id="breathCountDisplay">0</div>
+  <div class="bpm-unit">Atemzüge</div>
+  <div class="rate-line" id="rateLine">– / Min</div>
+  <div class="phase-line hidden" id="phaseLine"></div>
   <div class="measure-stats" id="measureStats"></div>
   <div class="controls">
     <button id="measureToggleBtn">Messung starten</button>
@@ -237,7 +251,7 @@
   </div>
 </div>
 
-<div class="info" id="infoText">Zwei kurze Einatmungen durch die Nase, eine lange Ausatmung durch den Mund — beruhigt das Nervensystem.</div>
+<div class="info" id="infoText">Die Erkennung nutzt den Bewegungssensor des Handys und ist eine Orientierung, kein medizinisches Messgerät.</div>
 
 <script>
 const circle = document.getElementById('circle');
@@ -380,58 +394,139 @@ modeSwitch.addEventListener('click', () => {
 });
 
 // ---------- Atmung messen (Accelerometer) ----------
-const bpmDisplay = document.getElementById('bpmDisplay');
+const breathCountDisplay = document.getElementById('breathCountDisplay');
+const rateLine = document.getElementById('rateLine');
+const phaseLine = document.getElementById('phaseLine');
 const measureStats = document.getElementById('measureStats');
 const measureToggleBtn = document.getElementById('measureToggleBtn');
 const measureResetBtn = document.getElementById('measureResetBtn');
 
 let measuring = false;
-let smooth = null;
-let prevSmooth = null;
-let lastDirection = 0;
 let lastPeakTime = 0;
-let peakIntervals = [];
 let breathCount = 0;
 let sessionStart = 0;
-const MIN_PEAK_INTERVAL = 1800; // ms, verhindert Doppel-Zählung
-const ALPHA = 0.15;
+const MIN_PEAK_INTERVAL = 2500; // ms, verhindert Doppel-Zählung (max ~24 Atemzüge/min)
+
+// Phasen-Timing (Ein-/Ausatemzeit): ein Atemzyklus ist eine Schwingung des Atemsignals.
+// Scheitel (Maximum) und Tal (Minimum) begrenzen die beiden Halbphasen. Wir messen
+// Tal->Scheitel und Scheitel->Tal. Welche davon Ein- bzw. Ausatmen ist, lässt sich aus
+// dem Sensor allein nicht sicher bestimmen; in Ruhe ist die Ausatmung meist die längere
+// Phase, danach wird zugeordnet. Nur bei sauberem Signal (Handy ruhig & flach) sind
+// beide Halbphasen zuverlässig messbar – sonst bleibt die Anzeige verborgen.
+const MIN_HALF_PHASE = 800;   // ms, Mindestabstand Scheitel<->Tal
+const PHASE_MIN = 800;        // ms, plausible Halbphase (min)
+const PHASE_MAX = 12000;      // ms, plausible Halbphase (max)
+let lastTroughTime = 0;
+let lastPeakT = null;         // Zeit des letzten Scheitels (für Ab-Phase)
+let lastTroughT = null;       // Zeit des letzten Tals (für Auf-Phase)
+let risePhases = [];          // Tal->Scheitel (ms), letzte 5
+let fallPhases = [];          // Scheitel->Tal (ms), letzte 5
+
+// --- Zustand des Atem-Detektors (siehe Analyse der Sensor-Rohdaten) ---
+// Das Atemsignal steckt NICHT in der linearen Beschleunigung (event.acceleration) –
+// die ist bei ruhig auf dem Bauch liegendem Handy ~0. Das Atmen kippt das Handy nur
+// leicht, also steckt das Signal in der Orientierung, d.h. im Schwerkraftvektor
+// (accelerationIncludingGravity). Wir verfolgen eine langsame Basis-Orientierung,
+// bilden die Abweichung (Bandpass) und projizieren sie auf ihre eigene, langsam
+// adaptierte Hauptrichtung -> ein orientierungsunabhängiges, vorzeichenbehaftetes
+// Atemsignal, dessen Maxima wir zählen.
+const TAU_SLOW = 6.0;   // s, Basis-Orientierung (entfernt langsame Drift)
+const TAU_FAST = 0.6;   // s, entrauscht
+const U_ADAPT  = 0.02;  // Lernrate der Hauptrichtung
+const ENV_ADAPT = 0.02; // Lernrate der Amplituden-Hüllkurve
+const THR_FRAC = 0.35;  // Schwelle relativ zur Hüllkurve
+let dSlow = null, dFast = null;   // EMAs des Schwerkraftvektors [x,y,z]
+let uDir = [0, 0, 0];             // adaptierte Hauptrichtung
+let env = 0;                      // Amplituden-Hüllkurve von s
+let prevS = 0, sRising = false;   // für Maxima-Erkennung
+let lastMotionTs = 0;             // für zeitbasierte EMA-Faktoren
 
 function motionHandler(event) {
-  const acc = (event.acceleration && event.acceleration.x != null)
-    ? event.acceleration
-    : event.accelerationIncludingGravity;
-  if (!acc || acc.x === null) return;
+  // Schwerkraft-inkl.-Vektor bevorzugen (enthält das Atem-/Kippsignal)
+  const g = (event.accelerationIncludingGravity && event.accelerationIncludingGravity.x != null)
+    ? event.accelerationIncludingGravity
+    : event.acceleration;
+  if (!g || g.x == null) return;
+  const vec = [g.x || 0, g.y || 0, g.z || 0];
 
-  const raw = Math.sqrt((acc.x||0)**2 + (acc.y||0)**2 + (acc.z||0)**2);
-  smooth = (smooth === null) ? raw : smooth + ALPHA * (raw - smooth);
+  const now = Date.now();
+  // dt-abhängige EMA-Faktoren, damit die Erkennung von der Sensorrate unabhängig ist
+  const dt = lastMotionTs ? Math.min((now - lastMotionTs) / 1000, 0.2) : 1 / 60;
+  lastMotionTs = now;
+  const aSlow = 1 - Math.exp(-dt / TAU_SLOW);
+  const aFast = 1 - Math.exp(-dt / TAU_FAST);
 
-  if (prevSmooth !== null) {
-    const dir = smooth > prevSmooth ? 1 : (smooth < prevSmooth ? -1 : lastDirection);
-    const now = Date.now();
-    if (lastDirection === 1 && dir === -1 && (now - lastPeakTime) > MIN_PEAK_INTERVAL) {
-      registerBreath(now);
-      lastPeakTime = now;
-    }
-    lastDirection = dir;
+  if (dSlow === null) { dSlow = vec.slice(); dFast = vec.slice(); return; }
+
+  const d = [0, 0, 0];
+  for (let k = 0; k < 3; k++) {
+    dSlow[k] += aSlow * (vec[k] - dSlow[k]);
+    dFast[k] += aFast * (vec[k] - dFast[k]);
+    d[k] = dFast[k] - dSlow[k];            // Bandpass = entrauscht − Basis
   }
-  prevSmooth = smooth;
+
+  // Hauptrichtung uDir langsam Richtung Abweichung ziehen (vorzeichen-konsistent)
+  const nd = Math.hypot(d[0], d[1], d[2]) + 1e-9;
+  const sign = (d[0]*uDir[0] + d[1]*uDir[1] + d[2]*uDir[2]) < 0 ? -1 : 1;
+  for (let k = 0; k < 3; k++) uDir[k] += U_ADAPT * (sign * d[k] / nd - uDir[k]);
+  const nu = Math.hypot(uDir[0], uDir[1], uDir[2]) + 1e-9;
+
+  // Projektion = orientierungsunabhängiges Atemsignal
+  const s = (d[0]*uDir[0] + d[1]*uDir[1] + d[2]*uDir[2]) / nu;
+  env += ENV_ADAPT * (Math.abs(s) - env);
+  const thr = THR_FRAC * env;
+
+  const rising = s > prevS;
+  // Scheitel (lokales Maximum über Schwelle) = ein Atemzug
+  if (sRising && !rising && prevS > thr && prevS > 0.1 && (now - lastPeakTime) > MIN_PEAK_INTERVAL) {
+    if (lastTroughT !== null) recordPhase(risePhases, now - lastTroughT); // Tal->Scheitel
+    registerBreath(now);
+    lastPeakTime = now;
+    lastPeakT = now;
+  }
+  // Tal (lokales Minimum unter −Schwelle) = Grenze für Phasentiming
+  if (!sRising && rising && prevS < -thr && (now - lastTroughTime) > MIN_HALF_PHASE) {
+    if (lastPeakT !== null) recordPhase(fallPhases, now - lastPeakT);   // Scheitel->Tal
+    lastTroughTime = now;
+    lastTroughT = now;
+  }
+  sRising = rising;
+  prevS = s;
+}
+
+function recordPhase(arr, dur) {
+  if (dur < PHASE_MIN || dur > PHASE_MAX) return; // unplausible Halbphase verwerfen
+  arr.push(dur);
+  if (arr.length > 5) arr.shift();
+}
+
+function updatePhaseDisplay() {
+  // erst anzeigen, wenn beide Halbphasen mehrfach sauber gemessen wurden
+  if (risePhases.length >= 2 && fallPhases.length >= 2) {
+    const avg = a => a.reduce((x, y) => x + y, 0) / a.length / 1000;
+    const p1 = avg(risePhases), p2 = avg(fallPhases);
+    const ein = Math.min(p1, p2); // in Ruhe kürzere Phase = Einatmen
+    const aus = Math.max(p1, p2); // längere Phase = Ausatmen
+    phaseLine.innerHTML =
+      `Einatmen <span class="val">~${ein.toFixed(1)} s</span> · ` +
+      `Ausatmen <span class="val">~${aus.toFixed(1)} s</span>`;
+    phaseLine.classList.remove('hidden');
+  }
 }
 
 function registerBreath(now) {
   breathCount++;
-  if (lastPeakTime > 0) {
-    peakIntervals.push(now - lastPeakTime);
-    if (peakIntervals.length > 6) peakIntervals.shift();
-  }
+  breathCountDisplay.textContent = breathCount;
   if (navigator.vibrate) navigator.vibrate(30);
 
-  if (peakIntervals.length >= 2) {
-    const avgInterval = peakIntervals.reduce((a,b) => a+b, 0) / peakIntervals.length;
-    const bpm = Math.round(60000 / avgInterval);
-    bpmDisplay.textContent = bpm;
+  // Rate aus Gesamtzahl/Zeit statt Momentan-Intervallen: robuster gegen
+  // vereinzelte Doppel-Peaks und Lücken (ab ~20 s stabil).
+  const elapsedMin = (now - sessionStart) / 60000;
+  if (elapsedMin > 0.33) {
+    rateLine.textContent = `${Math.round(breathCount / elapsedMin)} / Min`;
   }
-  const elapsedMin = ((now - sessionStart) / 60000).toFixed(1);
-  measureStats.textContent = `${breathCount} Atemzüge erfasst · ${elapsedMin} Min`;
+  updatePhaseDisplay();
+  measureStats.textContent = `${elapsedMin.toFixed(1)} Min gemessen`;
 }
 
 async function startMeasuring() {
@@ -454,14 +549,25 @@ async function startMeasuring() {
   }
 
   measuring = true;
-  smooth = null;
-  prevSmooth = null;
-  lastDirection = 0;
+  dSlow = null;
+  dFast = null;
+  uDir = [0, 0, 0];
+  env = 0;
+  prevS = 0;
+  sRising = false;
+  lastMotionTs = 0;
   lastPeakTime = 0;
-  peakIntervals = [];
   breathCount = 0;
+  lastTroughTime = 0;
+  lastPeakT = null;
+  lastTroughT = null;
+  risePhases = [];
+  fallPhases = [];
   sessionStart = Date.now();
-  bpmDisplay.textContent = '–';
+  breathCountDisplay.textContent = '0';
+  rateLine.textContent = '– / Min';
+  phaseLine.classList.add('hidden');
+  phaseLine.textContent = '';
   measureStats.textContent = 'Messung läuft …';
   measureToggleBtn.textContent = 'Messung stoppen';
   requestWakeLock();
@@ -477,7 +583,11 @@ function stopMeasuring() {
 
 function resetMeasuring() {
   stopMeasuring();
-  bpmDisplay.textContent = '–';
+  breathCount = 0;
+  breathCountDisplay.textContent = '0';
+  rateLine.textContent = '– / Min';
+  phaseLine.classList.add('hidden');
+  phaseLine.textContent = '';
   measureStats.textContent = '';
 }
 
