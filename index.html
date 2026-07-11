@@ -386,35 +386,74 @@ const measureToggleBtn = document.getElementById('measureToggleBtn');
 const measureResetBtn = document.getElementById('measureResetBtn');
 
 let measuring = false;
-let smooth = null;
-let prevSmooth = null;
-let lastDirection = 0;
 let lastPeakTime = 0;
 let peakIntervals = [];
 let breathCount = 0;
 let sessionStart = 0;
-const MIN_PEAK_INTERVAL = 1800; // ms, verhindert Doppel-Zählung
-const ALPHA = 0.15;
+const MIN_PEAK_INTERVAL = 2500; // ms, verhindert Doppel-Zählung (max ~24 Atemzüge/min)
+
+// --- Zustand des Atem-Detektors (siehe Analyse der Sensor-Rohdaten) ---
+// Das Atemsignal steckt NICHT in der linearen Beschleunigung (event.acceleration) –
+// die ist bei ruhig auf dem Bauch liegendem Handy ~0. Das Atmen kippt das Handy nur
+// leicht, also steckt das Signal in der Orientierung, d.h. im Schwerkraftvektor
+// (accelerationIncludingGravity). Wir verfolgen eine langsame Basis-Orientierung,
+// bilden die Abweichung (Bandpass) und projizieren sie auf ihre eigene, langsam
+// adaptierte Hauptrichtung -> ein orientierungsunabhängiges, vorzeichenbehaftetes
+// Atemsignal, dessen Maxima wir zählen.
+const TAU_SLOW = 6.0;   // s, Basis-Orientierung (entfernt langsame Drift)
+const TAU_FAST = 0.6;   // s, entrauscht
+const U_ADAPT  = 0.02;  // Lernrate der Hauptrichtung
+const ENV_ADAPT = 0.02; // Lernrate der Amplituden-Hüllkurve
+const THR_FRAC = 0.35;  // Schwelle relativ zur Hüllkurve
+let dSlow = null, dFast = null;   // EMAs des Schwerkraftvektors [x,y,z]
+let uDir = [0, 0, 0];             // adaptierte Hauptrichtung
+let env = 0;                      // Amplituden-Hüllkurve von s
+let prevS = 0, sRising = false;   // für Maxima-Erkennung
+let lastMotionTs = 0;             // für zeitbasierte EMA-Faktoren
 
 function motionHandler(event) {
-  const acc = (event.acceleration && event.acceleration.x != null)
-    ? event.acceleration
-    : event.accelerationIncludingGravity;
-  if (!acc || acc.x === null) return;
+  // Schwerkraft-inkl.-Vektor bevorzugen (enthält das Atem-/Kippsignal)
+  const g = (event.accelerationIncludingGravity && event.accelerationIncludingGravity.x != null)
+    ? event.accelerationIncludingGravity
+    : event.acceleration;
+  if (!g || g.x == null) return;
+  const vec = [g.x || 0, g.y || 0, g.z || 0];
 
-  const raw = Math.sqrt((acc.x||0)**2 + (acc.y||0)**2 + (acc.z||0)**2);
-  smooth = (smooth === null) ? raw : smooth + ALPHA * (raw - smooth);
+  const now = Date.now();
+  // dt-abhängige EMA-Faktoren, damit die Erkennung von der Sensorrate unabhängig ist
+  const dt = lastMotionTs ? Math.min((now - lastMotionTs) / 1000, 0.2) : 1 / 60;
+  lastMotionTs = now;
+  const aSlow = 1 - Math.exp(-dt / TAU_SLOW);
+  const aFast = 1 - Math.exp(-dt / TAU_FAST);
 
-  if (prevSmooth !== null) {
-    const dir = smooth > prevSmooth ? 1 : (smooth < prevSmooth ? -1 : lastDirection);
-    const now = Date.now();
-    if (lastDirection === 1 && dir === -1 && (now - lastPeakTime) > MIN_PEAK_INTERVAL) {
-      registerBreath(now);
-      lastPeakTime = now;
-    }
-    lastDirection = dir;
+  if (dSlow === null) { dSlow = vec.slice(); dFast = vec.slice(); return; }
+
+  const d = [0, 0, 0];
+  for (let k = 0; k < 3; k++) {
+    dSlow[k] += aSlow * (vec[k] - dSlow[k]);
+    dFast[k] += aFast * (vec[k] - dFast[k]);
+    d[k] = dFast[k] - dSlow[k];            // Bandpass = entrauscht − Basis
   }
-  prevSmooth = smooth;
+
+  // Hauptrichtung uDir langsam Richtung Abweichung ziehen (vorzeichen-konsistent)
+  const nd = Math.hypot(d[0], d[1], d[2]) + 1e-9;
+  const sign = (d[0]*uDir[0] + d[1]*uDir[1] + d[2]*uDir[2]) < 0 ? -1 : 1;
+  for (let k = 0; k < 3; k++) uDir[k] += U_ADAPT * (sign * d[k] / nd - uDir[k]);
+  const nu = Math.hypot(uDir[0], uDir[1], uDir[2]) + 1e-9;
+
+  // Projektion = orientierungsunabhängiges Atemsignal
+  const s = (d[0]*uDir[0] + d[1]*uDir[1] + d[2]*uDir[2]) / nu;
+  env += ENV_ADAPT * (Math.abs(s) - env);
+  const thr = THR_FRAC * env;
+
+  // lokales Maximum von s oberhalb der Schwelle = ein Atemzug (Einatem-Scheitel)
+  const rising = s > prevS;
+  if (sRising && !rising && prevS > thr && prevS > 0.1 && (now - lastPeakTime) > MIN_PEAK_INTERVAL) {
+    registerBreath(now);
+    lastPeakTime = now;
+  }
+  sRising = rising;
+  prevS = s;
 }
 
 function registerBreath(now) {
@@ -454,9 +493,13 @@ async function startMeasuring() {
   }
 
   measuring = true;
-  smooth = null;
-  prevSmooth = null;
-  lastDirection = 0;
+  dSlow = null;
+  dFast = null;
+  uDir = [0, 0, 0];
+  env = 0;
+  prevS = 0;
+  sRising = false;
+  lastMotionTs = 0;
   lastPeakTime = 0;
   peakIntervals = [];
   breathCount = 0;
