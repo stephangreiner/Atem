@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Physiologisches Atmen</title>
+<style>
+  :root {
+    --bg: #0f1b2b;
+    --circle: #6fa8dc;
+    --circle-glow: #a4c8e8;
+    --text: #e8f0f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    background: radial-gradient(circle at center, #16283f 0%, var(--bg) 70%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    overflow: hidden;
+  }
+  .stage {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ring {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  #maxRing {
+    width: 198px;
+    height: 198px;
+    border: 1px dashed rgba(255,255,255,0.35);
+  }
+  #minRing {
+    width: 96px;
+    height: 96px;
+    border: 1px dashed rgba(255,255,255,0.25);
+  }
+  .circle {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--circle-glow), var(--circle));
+    box-shadow: 0 0 40px rgba(111,168,220,0.6);
+    transition: transform linear, box-shadow linear;
+  }
+  .phase-label {
+    margin-top: 36px;
+    font-size: 1.3rem;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+    min-height: 1.6em;
+    text-align: center;
+  }
+  .sub-label {
+    margin-top: 6px;
+    font-size: 0.9rem;
+    color: rgba(232,240,248,0.6);
+  }
+  .controls {
+    margin-top: 44px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+  button {
+    background: rgba(111,168,220,0.15);
+    border: 1px solid rgba(111,168,220,0.4);
+    color: var(--text);
+    padding: 10px 22px;
+    border-radius: 24px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: rgba(111,168,220,0.3); }
+  .counter {
+    margin-top: 18px;
+    font-size: 0.85rem;
+    color: rgba(232,240,248,0.5);
+  }
+  .info {
+    position: absolute;
+    bottom: 22px;
+    font-size: 0.78rem;
+    color: rgba(232,240,248,0.35);
+    text-align: center;
+    max-width: 320px;
+  }
+  .mode-switch {
+    position: absolute;
+    top: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: rgba(232,240,248,0.7);
+  }
+  .switch {
+    position: relative;
+    width: 50px;
+    height: 28px;
+    background: rgba(111,168,220,0.25);
+    border-radius: 16px;
+    cursor: pointer;
+    border: 1px solid rgba(111,168,220,0.4);
+    transition: background 0.2s;
+  }
+  .switch.on { background: rgba(111,168,220,0.6); }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--text);
+    transition: transform 0.2s;
+  }
+  .switch.on::after { transform: translateX(22px); }
+  .hidden { display: none !important; }
+  .measure-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 320px;
+  }
+  .measure-instructions {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: rgba(232,240,248,0.8);
+    margin-bottom: 24px;
+  }
+  .bpm-display {
+    font-size: 3rem;
+    font-weight: 600;
+  }
+  .bpm-unit {
+    font-size: 0.85rem;
+    color: rgba(232,240,248,0.5);
+    margin-top: 2px;
+  }
+  .measure-stats {
+    margin-top: 18px;
+    font-size: 0.85rem;
+    color: rgba(232,240,248,0.55);
+  }
+  .record-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    width: 100%;
+  }
+  .record-label {
+    font-size: 0.8rem;
+    color: rgba(232,240,248,0.45);
+    margin-bottom: 10px;
+  }
+  textarea {
+    width: 100%;
+    height: 110px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: monospace;
+    font-size: 0.7rem;
+    padding: 8px;
+    resize: vertical;
+    margin-top: 10px;
+  }
+  a.download-link {
+    color: var(--circle-glow);
+    font-size: 0.85rem;
+    text-decoration: underline;
+    margin-top: 8px;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<div class="mode-switch">
+  <span>Geführt</span>
+  <div class="switch" id="modeSwitch"></div>
+  <span>Atmung messen</span>
+</div>
+
+<div id="guidedPanel">
+  <div class="stage">
+    <div class="ring" id="maxRing"></div>
+    <div class="ring" id="minRing"></div>
+    <div class="circle" id="circle"></div>
+  </div>
+
+  <div class="phase-label" id="phaseLabel">Bereit?</div>
+  <div class="sub-label" id="subLabel">Tippe auf Start</div>
+
+  <div class="controls">
+    <button id="toggleBtn">Start</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+
+  <div class="counter" id="cycleCounter"></div>
+</div>
+
+<div id="measurePanel" class="measure-panel hidden">
+  <div class="measure-instructions">Lege das Handy flach mit dem Bildschirm nach oben auf deinen Bauch und atme normal weiter.</div>
+  <div class="bpm-display" id="bpmDisplay">–</div>
+  <div class="bpm-unit">Atemzüge / Min</div>
+  <div class="measure-stats" id="measureStats"></div>
+  <div class="controls">
+    <button id="measureToggleBtn">Messung starten</button>
+    <button id="measureResetBtn">Reset</button>
+  </div>
+
+  <div class="record-section">
+    <div class="record-label">Debug: Rohdaten des Sensors aufzeichnen (für Analyse)</div>
+    <div class="controls">
+      <button id="recordToggleBtn">Aufzeichnung starten</button>
+    </div>
+    <div class="measure-stats" id="recordStats"></div>
+    <textarea id="recordOutput" readonly placeholder="Aufgezeichnete Daten erscheinen hier nach dem Stoppen …"></textarea>
+    <a id="downloadLink" class="download-link hidden" download="atem_rohdaten.csv">CSV herunterladen</a>
+  </div>
+</div>
+
+<div class="info" id="infoText">Zwei kurze Einatmungen durch die Nase, eine lange Ausatmung durch den Mund — beruhigt das Nervensystem.</div>
+
+<script>
+const circle = document.getElementById('circle');
+const phaseLabel = document.getElementById('phaseLabel');
+const subLabel = document.getElementById('subLabel');
+const toggleBtn = document.getElementById('toggleBtn');
+const resetBtn = document.getElementById('resetBtn');
+const cycleCounter = document.getElementById('cycleCounter');
+
+// Phasen: [Name, Dauer(ms), Zielskalierung, Untertitel]
+const MIN_SCALE = 1.0;
+const MAX_SCALE = 2.2;
+const phases = [
+  { name: 'Einatmen', duration: 2000, scale: MAX_SCALE, sub: 'zügig, durch die Nase', vibrateOnStart: true },
+  { name: 'Ausatmen', duration: 13000, scale: MIN_SCALE, sub: 'langsam, durch den Mund', vibrateOnStart: false }
+];
+
+let running = false;
+let timeoutId = null;
+let phaseIndex = 0;
+let cycleCount = 0;
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (err) {
+    // Wake Lock nicht verfügbar oder verweigert – Übung läuft trotzdem weiter
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (running && document.visibilityState === 'visible') {
+    requestWakeLock();
+  }
+});
+
+function setCircleTransition(durationMs) {
+  circle.style.transition = `transform ${durationMs}ms ease-in-out, box-shadow ${durationMs}ms ease-in-out`;
+}
+
+function runPhase() {
+  if (!running) return;
+  const phase = phases[phaseIndex];
+
+  setCircleTransition(phase.duration);
+  circle.style.transform = `scale(${phase.scale})`;
+  circle.style.boxShadow = phase.scale > 1
+    ? `0 0 70px rgba(164,200,232,0.9)`
+    : `0 0 25px rgba(111,168,220,0.5)`;
+
+  phaseLabel.textContent = phase.name;
+  subLabel.textContent = phase.sub;
+
+  if (phase.vibrateOnStart && navigator.vibrate) {
+    navigator.vibrate(60);
+  }
+
+  timeoutId = setTimeout(() => {
+    if (phaseIndex === phases.length - 1) {
+      cycleCount++;
+      cycleCounter.textContent = `Zyklen: ${cycleCount}`;
+    }
+    phaseIndex = (phaseIndex + 1) % phases.length;
+    runPhase();
+  }, phase.duration);
+}
+
+function start() {
+  running = true;
+  phaseIndex = 0;
+  toggleBtn.textContent = 'Pause';
+  requestWakeLock();
+  runPhase();
+}
+
+function pause() {
+  running = false;
+  clearTimeout(timeoutId);
+  releaseWakeLock();
+  toggleBtn.textContent = 'Weiter';
+  phaseLabel.textContent = 'Pausiert';
+  subLabel.textContent = '';
+}
+
+function reset() {
+  running = false;
+  clearTimeout(timeoutId);
+  releaseWakeLock();
+  phaseIndex = 0;
+  cycleCount = 0;
+  cycleCounter.textContent = '';
+  setCircleTransition(600);
+  circle.style.transform = 'scale(1)';
+  circle.style.boxShadow = '0 0 40px rgba(111,168,220,0.6)';
+  phaseLabel.textContent = 'Bereit?';
+  subLabel.textContent = 'Tippe auf Start';
+  toggleBtn.textContent = 'Start';
+}
+
+toggleBtn.addEventListener('click', () => {
+  if (running) {
+    pause();
+  } else {
+    start();
+  }
+});
+
+resetBtn.addEventListener('click', reset);
+
+// ---------- Modus-Switch ----------
+const modeSwitch = document.getElementById('modeSwitch');
+const guidedPanel = document.getElementById('guidedPanel');
+const measurePanel = document.getElementById('measurePanel');
+const infoText = document.getElementById('infoText');
+
+modeSwitch.addEventListener('click', () => {
+  const toMeasure = !modeSwitch.classList.contains('on');
+  modeSwitch.classList.toggle('on', toMeasure);
+  if (toMeasure) {
+    pause();
+    guidedPanel.classList.add('hidden');
+    measurePanel.classList.remove('hidden');
+    infoText.textContent = 'Die Erkennung nutzt den Bewegungssensor des Handys und ist eine Orientierung, kein medizinisches Messgerät.';
+  } else {
+    stopMeasuring();
+    measurePanel.classList.add('hidden');
+    guidedPanel.classList.remove('hidden');
+    infoText.textContent = 'Zwei kurze Einatmungen durch die Nase, eine lange Ausatmung durch den Mund — beruhigt das Nervensystem.';
+  }
+});
+
+// ---------- Atmung messen (Accelerometer) ----------
+const bpmDisplay = document.getElementById('bpmDisplay');
+const measureStats = document.getElementById('measureStats');
+const measureToggleBtn = document.getElementById('measureToggleBtn');
+const measureResetBtn = document.getElementById('measureResetBtn');
+
+let measuring = false;
+let smooth = null;
+let prevSmooth = null;
+let lastDirection = 0;
+let lastPeakTime = 0;
+let peakIntervals = [];
+let breathCount = 0;
+let sessionStart = 0;
+const MIN_PEAK_INTERVAL = 1800; // ms, verhindert Doppel-Zählung
+const ALPHA = 0.15;
+
+function motionHandler(event) {
+  const acc = (event.acceleration && event.acceleration.x != null)
+    ? event.acceleration
+    : event.accelerationIncludingGravity;
+  if (!acc || acc.x === null) return;
+
+  const raw = Math.sqrt((acc.x||0)**2 + (acc.y||0)**2 + (acc.z||0)**2);
+  smooth = (smooth === null) ? raw : smooth + ALPHA * (raw - smooth);
+
+  if (prevSmooth !== null) {
+    const dir = smooth > prevSmooth ? 1 : (smooth < prevSmooth ? -1 : lastDirection);
+    const now = Date.now();
+    if (lastDirection === 1 && dir === -1 && (now - lastPeakTime) > MIN_PEAK_INTERVAL) {
+      registerBreath(now);
+      lastPeakTime = now;
+    }
+    lastDirection = dir;
+  }
+  prevSmooth = smooth;
+}
+
+function registerBreath(now) {
+  breathCount++;
+  if (lastPeakTime > 0) {
+    peakIntervals.push(now - lastPeakTime);
+    if (peakIntervals.length > 6) peakIntervals.shift();
+  }
+  if (navigator.vibrate) navigator.vibrate(30);
+
+  if (peakIntervals.length >= 2) {
+    const avgInterval = peakIntervals.reduce((a,b) => a+b, 0) / peakIntervals.length;
+    const bpm = Math.round(60000 / avgInterval);
+    bpmDisplay.textContent = bpm;
+  }
+  const elapsedMin = ((now - sessionStart) / 60000).toFixed(1);
+  measureStats.textContent = `${breathCount} Atemzüge erfasst · ${elapsedMin} Min`;
+}
+
+async function startMeasuring() {
+  // iOS 13+ benötigt explizite Erlaubnis
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') {
+        measureStats.textContent = 'Zugriff auf Bewegungssensor wurde nicht erlaubt.';
+        return;
+      }
+    } catch (err) {
+      measureStats.textContent = 'Bewegungssensor nicht verfügbar.';
+      return;
+    }
+  }
+  if (!('DeviceMotionEvent' in window)) {
+    measureStats.textContent = 'Dieses Gerät unterstützt keine Bewegungsmessung.';
+    return;
+  }
+
+  measuring = true;
+  smooth = null;
+  prevSmooth = null;
+  lastDirection = 0;
+  lastPeakTime = 0;
+  peakIntervals = [];
+  breathCount = 0;
+  sessionStart = Date.now();
+  bpmDisplay.textContent = '–';
+  measureStats.textContent = 'Messung läuft …';
+  measureToggleBtn.textContent = 'Messung stoppen';
+  requestWakeLock();
+  window.addEventListener('devicemotion', motionHandler);
+}
+
+function stopMeasuring() {
+  measuring = false;
+  window.removeEventListener('devicemotion', motionHandler);
+  releaseWakeLock();
+  measureToggleBtn.textContent = 'Messung starten';
+}
+
+function resetMeasuring() {
+  stopMeasuring();
+  bpmDisplay.textContent = '–';
+  measureStats.textContent = '';
+}
+
+measureToggleBtn.addEventListener('click', () => {
+  if (measuring) {
+    stopMeasuring();
+  } else {
+    startMeasuring();
+  }
+});
+
+measureResetBtn.addEventListener('click', resetMeasuring);
+
+// ---------- Rohdaten-Aufzeichnung (Debug) ----------
+const recordToggleBtn = document.getElementById('recordToggleBtn');
+const recordStats = document.getElementById('recordStats');
+const recordOutput = document.getElementById('recordOutput');
+const downloadLink = document.getElementById('downloadLink');
+
+let recording = false;
+let recordedSamples = [];
+let recordStart = 0;
+const MAX_SAMPLES = 4000; // Sicherheitsgrenze
+
+function recordHandler(event) {
+  if (recordedSamples.length >= MAX_SAMPLES) {
+    stopRecording();
+    return;
+  }
+  const acc = event.acceleration || {};
+  const accG = event.accelerationIncludingGravity || {};
+  const rot = event.rotationRate || {};
+  recordedSamples.push({
+    t: Date.now() - recordStart,
+    ax: acc.x, ay: acc.y, az: acc.z,
+    gx: accG.x, gy: accG.y, gz: accG.z,
+    rax: rot.alpha, rbeta: rot.beta, rgamma: rot.gamma
+  });
+  if (recordedSamples.length % 20 === 0) {
+    recordStats.textContent = `${recordedSamples.length} Samples aufgezeichnet …`;
+  }
+}
+
+async function startRecording() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') {
+        recordStats.textContent = 'Zugriff auf Bewegungssensor wurde nicht erlaubt.';
+        return;
+      }
+    } catch (err) {
+      recordStats.textContent = 'Bewegungssensor nicht verfügbar.';
+      return;
+    }
+  }
+  if (!('DeviceMotionEvent' in window)) {
+    recordStats.textContent = 'Dieses Gerät unterstützt keine Bewegungsmessung.';
+    return;
+  }
+
+  recording = true;
+  recordedSamples = [];
+  recordStart = Date.now();
+  recordOutput.value = '';
+  downloadLink.classList.add('hidden');
+  recordStats.textContent = 'Aufzeichnung läuft … Handy jetzt auf den Bauch legen.';
+  recordToggleBtn.textContent = 'Aufzeichnung stoppen';
+  requestWakeLock();
+  window.addEventListener('devicemotion', recordHandler);
+}
+
+function stopRecording() {
+  recording = false;
+  window.removeEventListener('devicemotion', recordHandler);
+  releaseWakeLock();
+  recordToggleBtn.textContent = 'Aufzeichnung starten';
+
+  if (recordedSamples.length === 0) {
+    recordStats.textContent = 'Keine Daten erfasst — Sensor evtl. nicht verfügbar.';
+    return;
+  }
+
+  const header = 't_ms,ax,ay,az,gx,gy,gz,rot_alpha,rot_beta,rot_gamma';
+  const rows = recordedSamples.map(s =>
+    [s.t, s.ax, s.ay, s.az, s.gx, s.gy, s.gz, s.rax, s.rbeta, s.rgamma]
+      .map(v => (v === null || v === undefined) ? '' : (typeof v === 'number' ? v.toFixed(4) : v))
+      .join(',')
+  );
+  const csv = [header, ...rows].join('\n');
+
+  recordOutput.value = csv;
+  recordStats.textContent = `${recordedSamples.length} Samples über ${(recordedSamples[recordedSamples.length-1].t/1000).toFixed(1)}s. In das Textfeld tippen und alles kopieren, oder CSV herunterladen.`;
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  downloadLink.href = url;
+  downloadLink.classList.remove('hidden');
+}
+
+recordToggleBtn.addEventListener('click', () => {
+  if (recording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+});
+</script>
+
+</body>
+</html>
