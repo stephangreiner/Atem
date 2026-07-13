@@ -234,11 +234,11 @@
 
 <div class="mode-switch">
   <span>Geführt</span>
-  <div class="switch on" id="modeSwitch"></div>
+  <div class="switch" id="modeSwitch"></div>
   <span>Atmung messen</span>
 </div>
 
-<div id="guidedPanel" class="hidden">
+<div id="guidedPanel">
   <div class="stage">
     <div class="ring" id="maxRing"></div>
     <div class="ring" id="minRing"></div>
@@ -273,7 +273,7 @@
   </div>
 </div>
 
-<div id="measurePanel" class="measure-panel">
+<div id="measurePanel" class="measure-panel hidden">
   <div class="measure-instructions">Lege das Handy flach mit dem Bildschirm nach oben auf deinen Bauch und atme normal weiter.</div>
   <div class="bpm-display" id="breathCountDisplay">0</div>
   <div class="bpm-unit">Atemzüge</div>
@@ -296,7 +296,7 @@
   </div>
 </div>
 
-<div class="info" id="infoText">Die Erkennung nutzt den Bewegungssensor des Handys und ist eine Orientierung, kein medizinisches Messgerät.</div>
+<div class="info" id="infoText">Folge dem Rhythmus: Vibration zu Beginn jeder Phase — ein langer Impuls fürs Einatmen, zwei kurze fürs Ausatmen. Längen unten einstellbar.</div>
 
 <script>
 const circle = document.getElementById('circle');
