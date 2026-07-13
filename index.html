@@ -129,6 +129,34 @@
     transition: transform 0.2s;
   }
   .switch.on::after { transform: translateX(22px); }
+  .settings {
+    margin-top: 26px;
+    width: 260px;
+    max-width: 80vw;
+  }
+  .setting-row {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+  }
+  .setting-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    color: rgba(232,240,248,0.75);
+  }
+  .setting-val {
+    color: var(--circle-glow);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--circle);
+    cursor: pointer;
+  }
   .hidden { display: none !important; }
   .measure-panel {
     display: flex;
@@ -226,6 +254,23 @@
   </div>
 
   <div class="counter" id="cycleCounter"></div>
+
+  <div class="settings">
+    <div class="setting-row">
+      <div class="setting-head">
+        <span>Einatmen</span>
+        <span class="setting-val"><span id="inhaleVal">4</span> s</span>
+      </div>
+      <input type="range" id="inhaleRange" min="1" max="15" step="0.5" value="4">
+    </div>
+    <div class="setting-row">
+      <div class="setting-head">
+        <span>Ausatmen</span>
+        <span class="setting-val"><span id="exhaleVal">6</span> s</span>
+      </div>
+      <input type="range" id="exhaleRange" min="1" max="20" step="0.5" value="6">
+    </div>
+  </div>
 </div>
 
 <div id="measurePanel" class="measure-panel">
@@ -261,13 +306,26 @@ const toggleBtn = document.getElementById('toggleBtn');
 const resetBtn = document.getElementById('resetBtn');
 const cycleCounter = document.getElementById('cycleCounter');
 
-// Phasen: [Name, Dauer(ms), Zielskalierung, Untertitel]
+// Phasen: Dauer kommt aus der (einstellbaren) Konfiguration, die restlichen
+// Eigenschaften sind fest. Jede Phase hat ein eigenes Vibrationsmuster, damit
+// Ein- und Ausatmen ohne Blick aufs Display unterscheidbar sind.
 const MIN_SCALE = 1.0;
 const MAX_SCALE = 2.2;
-const phases = [
-  { name: 'Einatmen', duration: 2000, scale: MAX_SCALE, sub: 'zügig, durch die Nase', vibrateOnStart: true },
-  { name: 'Ausatmen', duration: 13000, scale: MIN_SCALE, sub: 'langsam, durch den Mund', vibrateOnStart: false }
+const phaseDefs = [
+  { name: 'Einatmen', key: 'inhale', scale: MAX_SCALE, sub: 'durch die Nase', vibrate: [220] },
+  { name: 'Ausatmen', key: 'exhale', scale: MIN_SCALE, sub: 'durch den Mund', vibrate: [80, 120, 80] }
 ];
+
+// Einstellbare Phasenlängen (Sekunden), aus localStorage geladen.
+const STORAGE_KEY = 'atem_guided_config';
+const config = { inhale: 4, exhale: 6 };
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  if (saved && typeof saved.inhale === 'number' && typeof saved.exhale === 'number') {
+    config.inhale = saved.inhale;
+    config.exhale = saved.exhale;
+  }
+} catch (err) { /* ungültige/leere Konfiguration – Defaults verwenden */ }
 
 let running = false;
 let timeoutId = null;
@@ -304,9 +362,10 @@ function setCircleTransition(durationMs) {
 
 function runPhase() {
   if (!running) return;
-  const phase = phases[phaseIndex];
+  const phase = phaseDefs[phaseIndex];
+  const duration = config[phase.key] * 1000; // Länge live aus der Konfiguration
 
-  setCircleTransition(phase.duration);
+  setCircleTransition(duration);
   circle.style.transform = `scale(${phase.scale})`;
   circle.style.boxShadow = phase.scale > 1
     ? `0 0 70px rgba(164,200,232,0.9)`
@@ -315,18 +374,19 @@ function runPhase() {
   phaseLabel.textContent = phase.name;
   subLabel.textContent = phase.sub;
 
-  if (phase.vibrateOnStart && navigator.vibrate) {
-    navigator.vibrate(60);
+  // Haptisches Signal zu Beginn jeder Phase (Ein-/Ausatmen unterscheidbar)
+  if (navigator.vibrate) {
+    navigator.vibrate(phase.vibrate);
   }
 
   timeoutId = setTimeout(() => {
-    if (phaseIndex === phases.length - 1) {
+    if (phaseIndex === phaseDefs.length - 1) {
       cycleCount++;
       cycleCounter.textContent = `Zyklen: ${cycleCount}`;
     }
-    phaseIndex = (phaseIndex + 1) % phases.length;
+    phaseIndex = (phaseIndex + 1) % phaseDefs.length;
     runPhase();
-  }, phase.duration);
+  }, duration);
 }
 
 function start() {
@@ -370,6 +430,43 @@ toggleBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', reset);
+
+// ---------- Einstellungen: Ein-/Ausatemlänge ----------
+const inhaleRange = document.getElementById('inhaleRange');
+const exhaleRange = document.getElementById('exhaleRange');
+const inhaleVal = document.getElementById('inhaleVal');
+const exhaleVal = document.getElementById('exhaleVal');
+
+function fmtSeconds(v) {
+  // ganze Zahlen ohne Nachkommastelle, sonst eine Nachkommastelle
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+function applyConfigToUI() {
+  inhaleRange.value = config.inhale;
+  exhaleRange.value = config.exhale;
+  inhaleVal.textContent = fmtSeconds(config.inhale);
+  exhaleVal.textContent = fmtSeconds(config.exhale);
+}
+
+function saveConfig() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch (err) { /* Speicher nicht verfügbar – Einstellung gilt nur für diese Sitzung */ }
+}
+
+inhaleRange.addEventListener('input', () => {
+  config.inhale = parseFloat(inhaleRange.value);
+  inhaleVal.textContent = fmtSeconds(config.inhale);
+  saveConfig();
+});
+exhaleRange.addEventListener('input', () => {
+  config.exhale = parseFloat(exhaleRange.value);
+  exhaleVal.textContent = fmtSeconds(config.exhale);
+  saveConfig();
+});
+
+applyConfigToUI();
 
 // ---------- Modus-Switch ----------
 const modeSwitch = document.getElementById('modeSwitch');
