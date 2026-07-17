@@ -2,7 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Physiologisches Atmen</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1b2b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atem">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <style>
   :root {
     --bg: #0f1b2b;
@@ -13,23 +22,36 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    height: 100vh;
+    min-height: 100vh;
     background: radial-gradient(circle at center, #16283f 0%, var(--bg) 70%);
+    background-attachment: fixed;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    padding: 20px 0 72px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: var(--text);
+    overflow-x: hidden;
+  }
+  /* Während der geführten Atmung: fixe, ruhige Bühne ohne Scrollen. */
+  body.running {
+    height: 100vh;
+    padding: 0;
     overflow: hidden;
+    justify-content: center;
   }
   .stage {
+    /* --c = Basis-Durchmesser des Kreises; alles skaliert damit und passt so
+       vom Handy bis zur kleinen Uhr (Pixel Watch). */
+    --c: min(96px, 26vmin);
     position: relative;
-    width: 280px;
-    height: 280px;
+    width: calc(var(--c) * 3.1);
+    height: calc(var(--c) * 3.1);
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.5s ease;
   }
   .ring {
     position: absolute;
@@ -37,18 +59,18 @@
     pointer-events: none;
   }
   #maxRing {
-    width: 198px;
-    height: 198px;
+    width: calc(var(--c) * 2.2);
+    height: calc(var(--c) * 2.2);
     border: 1px dashed rgba(255,255,255,0.35);
   }
   #minRing {
-    width: 96px;
-    height: 96px;
+    width: calc(var(--c) * 1.07);
+    height: calc(var(--c) * 1.07);
     border: 1px dashed rgba(255,255,255,0.25);
   }
   .circle {
-    width: 90px;
-    height: 90px;
+    width: var(--c);
+    height: var(--c);
     border-radius: 50%;
     background: radial-gradient(circle at 35% 35%, var(--circle-glow), var(--circle));
     box-shadow: 0 0 40px rgba(111,168,220,0.6);
@@ -90,12 +112,19 @@
     color: rgba(232,240,248,0.5);
   }
   .info {
-    position: absolute;
-    bottom: 22px;
+    margin-top: 28px;
     font-size: 0.78rem;
     color: rgba(232,240,248,0.35);
     text-align: center;
     max-width: 320px;
+    padding: 0 16px;
+    pointer-events: none;
+  }
+  /* Auf kleinen Displays (z. B. Pixel Watch) den Hinweistext ausblenden,
+     damit Kreis und Bedienelemente den Platz bekommen. */
+  @media (max-height: 480px), (max-width: 320px) {
+    .info { display: none; }
+    body { padding-bottom: 24px; }
   }
   .mode-switch {
     position: absolute;
@@ -154,10 +183,70 @@
   }
   input[type=range] {
     width: 100%;
-    accent-color: var(--circle);
     cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    /* großzügige Trefferfläche fürs Antippen am Handgelenk */
+    padding: 12px 0;
+    margin: 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 12px;
+    border-radius: 8px;
+    background: rgba(111,168,220,0.25);
+    border: 1px solid rgba(111,168,220,0.4);
+  }
+  input[type=range]::-moz-range-track {
+    height: 12px;
+    border-radius: 8px;
+    background: rgba(111,168,220,0.25);
+    border: 1px solid rgba(111,168,220,0.4);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 34px;
+    height: 34px;
+    margin-top: -12px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--circle-glow), var(--circle));
+    border: 2px solid rgba(255,255,255,0.85);
+    box-shadow: 0 0 10px rgba(111,168,220,0.7);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--circle-glow), var(--circle));
+    border: 2px solid rgba(255,255,255,0.85);
+    box-shadow: 0 0 10px rgba(111,168,220,0.7);
   }
   .hidden { display: none !important; }
+
+  /* Während die geführte Atmung läuft: Bedienelemente ausblenden und den
+     pulsierenden Kreis maximal groß zeigen (weniger Ablenkung, gut am Handgelenk). */
+  body.running .mode-switch,
+  body.running .settings,
+  body.running .counter,
+  body.running .info { display: none !important; }
+  body.running .stage {
+    --c: min(150px, 34vmin);
+    /* enge Bühne: nur so groß wie der Kreis bei maximaler Ausdehnung braucht */
+    width: calc(var(--c) * 2.5);
+    height: calc(var(--c) * 2.5);
+  }
+  body.running .phase-label { margin-top: 18px; }
+  body.running .controls { margin-top: 18px; }
+
+  /* Pixel Watch & Co.: kompakter, damit Kreis + Label + Pause zusammen passen */
+  @media (max-height: 480px), (max-width: 320px) {
+    body.running .stage { --c: 30vmin; }
+    body.running .phase-label { margin-top: 8px; font-size: 1.05rem; }
+    body.running .sub-label { display: none; }
+    body.running .controls { margin-top: 8px; gap: 8px; }
+    body.running button { padding: 7px 14px; font-size: 0.8rem; }
+  }
   .measure-panel {
     display: flex;
     flex-direction: column;
@@ -392,6 +481,7 @@ function runPhase() {
 function start() {
   running = true;
   phaseIndex = 0;
+  document.body.classList.add('running'); // Einstellungen ausblenden, Kreis groß
   toggleBtn.textContent = 'Pause';
   requestWakeLock();
   runPhase();
@@ -400,6 +490,7 @@ function start() {
 function pause() {
   running = false;
   clearTimeout(timeoutId);
+  document.body.classList.remove('running');
   releaseWakeLock();
   toggleBtn.textContent = 'Weiter';
   phaseLabel.textContent = 'Pausiert';
@@ -409,6 +500,7 @@ function pause() {
 function reset() {
   running = false;
   clearTimeout(timeoutId);
+  document.body.classList.remove('running');
   releaseWakeLock();
   phaseIndex = 0;
   cycleCount = 0;
@@ -792,6 +884,15 @@ recordToggleBtn.addEventListener('click', () => {
     startRecording();
   }
 });
+
+// ---------- PWA: Service Worker registrieren (installierbar/offline) ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Registrierung fehlgeschlagen (z. B. ohne HTTPS) – App läuft trotzdem
+    });
+  });
+}
 </script>
 
 </body>
