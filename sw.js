@@ -1,5 +1,5 @@
 // Minimaler Service Worker: macht die App installierbar und offline-fähig.
-const CACHE = 'atem-v1';
+const CACHE = 'atem-v2';
 const ASSETS = [
   '.',
   'index.html',

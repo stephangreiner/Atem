@@ -84,6 +84,12 @@
     min-height: 1.6em;
     text-align: center;
   }
+  /* Startseite kompakt halten: Kreis und Phasen-Texte erst zeigen, wenn die
+     Übung läuft — vorher sind sie statisch und ohne Funktion (wichtig auf
+     kleinen Displays wie der Pixel Watch, damit nichts scrollen muss). */
+  body:not(.running) #guidedPanel .stage,
+  body:not(.running) #guidedPanel .phase-label,
+  body:not(.running) #guidedPanel .sub-label { display: none; }
   .sub-label {
     margin-top: 6px;
     font-size: 0.9rem;
@@ -247,75 +253,54 @@
     body.running .controls { margin-top: 8px; gap: 8px; }
     body.running button { padding: 7px 14px; font-size: 0.8rem; }
   }
-  .measure-panel {
+  .timer-panel {
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
     max-width: 320px;
+    padding: 0 16px;
   }
-  .measure-instructions {
+  .timer-instructions {
     font-size: 0.95rem;
     line-height: 1.5;
     color: rgba(232,240,248,0.8);
     margin-bottom: 24px;
   }
-  .bpm-display {
-    font-size: 3rem;
+  .timer-display {
+    font-size: 3.4rem;
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
-  .bpm-unit {
+  .timer-unit {
     font-size: 0.85rem;
     color: rgba(232,240,248,0.5);
     margin-top: 2px;
   }
-  .rate-line {
-    margin-top: 4px;
-    font-size: 1.05rem;
-    color: rgba(232,240,248,0.8);
-  }
-  .phase-line {
-    margin-top: 14px;
-    font-size: 0.95rem;
-    color: var(--circle-glow);
-    line-height: 1.5;
-  }
-  .phase-line .val { font-weight: 600; }
-  .measure-stats {
+  .timer-stats {
     margin-top: 18px;
     font-size: 0.85rem;
     color: rgba(232,240,248,0.55);
+    min-height: 1.2em;
   }
-  .record-section {
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    width: 100%;
+  /* Läuft der Minutentakt: fast schwarzer Bildschirm (OLED-schonend, wenig
+     Ablenkung), nur eine gedimmte Minutenanzeige und die Bedienung bleiben. */
+  body.timer-running {
+    background: #000;
+    height: 100vh;
+    padding: 0;
+    overflow: hidden;
   }
-  .record-label {
-    font-size: 0.8rem;
-    color: rgba(232,240,248,0.45);
-    margin-bottom: 10px;
-  }
-  textarea {
-    width: 100%;
-    height: 110px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: monospace;
-    font-size: 0.7rem;
-    padding: 8px;
-    resize: vertical;
-    margin-top: 10px;
-  }
-  a.download-link {
-    color: var(--circle-glow);
-    font-size: 0.85rem;
-    text-decoration: underline;
-    margin-top: 8px;
-    display: inline-block;
+  body.timer-running .mode-switch,
+  body.timer-running .info,
+  body.timer-running .timer-instructions { display: none !important; }
+  body.timer-running .timer-display { color: rgba(232,240,248,0.35); }
+  body.timer-running .timer-unit,
+  body.timer-running .timer-stats { color: rgba(232,240,248,0.2); }
+  body.timer-running .timer-panel button {
+    background: transparent;
+    border-color: rgba(111,168,220,0.25);
+    color: rgba(232,240,248,0.35);
   }
 </style>
 </head>
@@ -324,7 +309,7 @@
 <div class="mode-switch">
   <span>Geführt</span>
   <div class="switch" id="modeSwitch"></div>
-  <span>Atmung messen</span>
+  <span>Minutentakt</span>
 </div>
 
 <div id="guidedPanel">
@@ -334,8 +319,8 @@
     <div class="circle" id="circle"></div>
   </div>
 
-  <div class="phase-label" id="phaseLabel">Bereit?</div>
-  <div class="sub-label" id="subLabel">Tippe auf Start</div>
+  <div class="phase-label" id="phaseLabel"></div>
+  <div class="sub-label" id="subLabel"></div>
 
   <div class="controls">
     <button id="toggleBtn">Start</button>
@@ -362,26 +347,14 @@
   </div>
 </div>
 
-<div id="measurePanel" class="measure-panel hidden">
-  <div class="measure-instructions">Lege das Handy flach mit dem Bildschirm nach oben auf deinen Bauch und atme normal weiter.</div>
-  <div class="bpm-display" id="breathCountDisplay">0</div>
-  <div class="bpm-unit">Atemzüge</div>
-  <div class="rate-line" id="rateLine">– / Min</div>
-  <div class="phase-line hidden" id="phaseLine"></div>
-  <div class="measure-stats" id="measureStats"></div>
+<div id="timerPanel" class="timer-panel hidden">
+  <div class="timer-instructions">Zeitgefühl-Training: bei jeder vollen Minute ab Start vibriert das Handy kräftig. Der Bildschirm bleibt dafür an (stark abgedunkelt) — im Sperrzustand kann eine Web-App nicht vibrieren.</div>
+  <div class="timer-display" id="timerDisplay">0</div>
+  <div class="timer-unit">Minuten</div>
+  <div class="timer-stats" id="timerStats"></div>
   <div class="controls">
-    <button id="measureToggleBtn">Messung starten</button>
-    <button id="measureResetBtn">Reset</button>
-  </div>
-
-  <div class="record-section">
-    <div class="record-label">Debug: Rohdaten des Sensors aufzeichnen (für Analyse)</div>
-    <div class="controls">
-      <button id="recordToggleBtn">Aufzeichnung starten</button>
-    </div>
-    <div class="measure-stats" id="recordStats"></div>
-    <textarea id="recordOutput" readonly placeholder="Aufgezeichnete Daten erscheinen hier nach dem Stoppen …"></textarea>
-    <a id="downloadLink" class="download-link hidden" download="atem_rohdaten.csv">CSV herunterladen</a>
+    <button id="timerToggleBtn">Start</button>
+    <button id="timerResetBtn">Reset</button>
   </div>
 </div>
 
@@ -440,7 +413,7 @@ function releaseWakeLock() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (running && document.visibilityState === 'visible') {
+  if ((running || timerRunning) && document.visibilityState === 'visible') {
     requestWakeLock();
   }
 });
@@ -493,7 +466,7 @@ function pause() {
   document.body.classList.remove('running');
   releaseWakeLock();
   toggleBtn.textContent = 'Weiter';
-  phaseLabel.textContent = 'Pausiert';
+  phaseLabel.textContent = '';
   subLabel.textContent = '';
 }
 
@@ -508,8 +481,8 @@ function reset() {
   setCircleTransition(600);
   circle.style.transform = 'scale(1)';
   circle.style.boxShadow = '0 0 40px rgba(111,168,220,0.6)';
-  phaseLabel.textContent = 'Bereit?';
-  subLabel.textContent = 'Tippe auf Start';
+  phaseLabel.textContent = '';
+  subLabel.textContent = '';
   toggleBtn.textContent = 'Start';
 }
 
@@ -563,327 +536,95 @@ applyConfigToUI();
 // ---------- Modus-Switch ----------
 const modeSwitch = document.getElementById('modeSwitch');
 const guidedPanel = document.getElementById('guidedPanel');
-const measurePanel = document.getElementById('measurePanel');
+const timerPanel = document.getElementById('timerPanel');
 const infoText = document.getElementById('infoText');
 
 modeSwitch.addEventListener('click', () => {
-  const toMeasure = !modeSwitch.classList.contains('on');
-  modeSwitch.classList.toggle('on', toMeasure);
-  if (toMeasure) {
-    pause();
+  const toTimer = !modeSwitch.classList.contains('on');
+  modeSwitch.classList.toggle('on', toTimer);
+  if (toTimer) {
+    if (running) pause();
     guidedPanel.classList.add('hidden');
-    measurePanel.classList.remove('hidden');
-    infoText.textContent = 'Die Erkennung nutzt den Bewegungssensor des Handys und ist eine Orientierung, kein medizinisches Messgerät.';
+    timerPanel.classList.remove('hidden');
+    infoText.textContent = 'Zeitgefühl-Training: das Handy vibriert bei jeder vollen Minute ab Start.';
   } else {
-    stopMeasuring();
-    measurePanel.classList.add('hidden');
+    stopTimer();
+    timerPanel.classList.add('hidden');
     guidedPanel.classList.remove('hidden');
-    infoText.textContent = 'Zwei kurze Einatmungen durch die Nase, eine lange Ausatmung durch den Mund — beruhigt das Nervensystem.';
+    infoText.textContent = 'Folge dem Rhythmus: Vibration zu Beginn jeder Phase — ein langer Impuls fürs Einatmen, zwei kurze fürs Ausatmen. Längen unten einstellbar.';
   }
 });
 
-// ---------- Atmung messen (Accelerometer) ----------
-const breathCountDisplay = document.getElementById('breathCountDisplay');
-const rateLine = document.getElementById('rateLine');
-const phaseLine = document.getElementById('phaseLine');
-const measureStats = document.getElementById('measureStats');
-const measureToggleBtn = document.getElementById('measureToggleBtn');
-const measureResetBtn = document.getElementById('measureResetBtn');
+// ---------- Minutentakt (Zeitgefühl-Training) ----------
+// Vibriert bei jeder vollen Minute seit dem Start. Die Minuten werden aus der
+// Uhrzeit (Date.now) berechnet, nicht aus gezählten Ticks: drosselt der Browser
+// den Timer zwischendurch, stimmt der Takt beim nächsten Tick trotzdem wieder.
+// Bei gesperrtem Bildschirm läuft eine Web-App nicht zuverlässig weiter und
+// navigator.vibrate wirkt nur bei sichtbarer Seite — deshalb hält ein Screen
+// Wake Lock den Bildschirm an, und die Anzeige wird stattdessen stark
+// abgedunkelt (OLED-schonend auf dem Pixel 4).
+const timerDisplay = document.getElementById('timerDisplay');
+const timerStats = document.getElementById('timerStats');
+const timerToggleBtn = document.getElementById('timerToggleBtn');
+const timerResetBtn = document.getElementById('timerResetBtn');
 
-let measuring = false;
-let lastPeakTime = 0;
-let breathCount = 0;
-let sessionStart = 0;
-const MIN_PEAK_INTERVAL = 2500; // ms, verhindert Doppel-Zählung (max ~24 Atemzüge/min)
+const MINUTE_VIBRATE = [400, 150, 400]; // kräftiger Doppel-Impuls, klar von Notifications unterscheidbar
+let timerRunning = false;
+let timerStartTime = 0;
+let timerMinutesFired = 0;
+let timerIntervalId = null;
 
-// Phasen-Timing (Ein-/Ausatemzeit): ein Atemzyklus ist eine Schwingung des Atemsignals.
-// Scheitel (Maximum) und Tal (Minimum) begrenzen die beiden Halbphasen. Wir messen
-// Tal->Scheitel und Scheitel->Tal. Welche davon Ein- bzw. Ausatmen ist, lässt sich aus
-// dem Sensor allein nicht sicher bestimmen; in Ruhe ist die Ausatmung meist die längere
-// Phase, danach wird zugeordnet. Nur bei sauberem Signal (Handy ruhig & flach) sind
-// beide Halbphasen zuverlässig messbar – sonst bleibt die Anzeige verborgen.
-const MIN_HALF_PHASE = 800;   // ms, Mindestabstand Scheitel<->Tal
-const PHASE_MIN = 800;        // ms, plausible Halbphase (min)
-const PHASE_MAX = 12000;      // ms, plausible Halbphase (max)
-let lastTroughTime = 0;
-let lastPeakT = null;         // Zeit des letzten Scheitels (für Ab-Phase)
-let lastTroughT = null;       // Zeit des letzten Tals (für Auf-Phase)
-let risePhases = [];          // Tal->Scheitel (ms), letzte 5
-let fallPhases = [];          // Scheitel->Tal (ms), letzte 5
-
-// --- Zustand des Atem-Detektors (siehe Analyse der Sensor-Rohdaten) ---
-// Das Atemsignal steckt NICHT in der linearen Beschleunigung (event.acceleration) –
-// die ist bei ruhig auf dem Bauch liegendem Handy ~0. Das Atmen kippt das Handy nur
-// leicht, also steckt das Signal in der Orientierung, d.h. im Schwerkraftvektor
-// (accelerationIncludingGravity). Wir verfolgen eine langsame Basis-Orientierung,
-// bilden die Abweichung (Bandpass) und projizieren sie auf ihre eigene, langsam
-// adaptierte Hauptrichtung -> ein orientierungsunabhängiges, vorzeichenbehaftetes
-// Atemsignal, dessen Maxima wir zählen.
-const TAU_SLOW = 6.0;   // s, Basis-Orientierung (entfernt langsame Drift)
-const TAU_FAST = 0.6;   // s, entrauscht
-const U_ADAPT  = 0.02;  // Lernrate der Hauptrichtung
-const ENV_ADAPT = 0.02; // Lernrate der Amplituden-Hüllkurve
-const THR_FRAC = 0.35;  // Schwelle relativ zur Hüllkurve
-let dSlow = null, dFast = null;   // EMAs des Schwerkraftvektors [x,y,z]
-let uDir = [0, 0, 0];             // adaptierte Hauptrichtung
-let env = 0;                      // Amplituden-Hüllkurve von s
-let prevS = 0, sRising = false;   // für Maxima-Erkennung
-let lastMotionTs = 0;             // für zeitbasierte EMA-Faktoren
-
-function motionHandler(event) {
-  // Schwerkraft-inkl.-Vektor bevorzugen (enthält das Atem-/Kippsignal)
-  const g = (event.accelerationIncludingGravity && event.accelerationIncludingGravity.x != null)
-    ? event.accelerationIncludingGravity
-    : event.acceleration;
-  if (!g || g.x == null) return;
-  const vec = [g.x || 0, g.y || 0, g.z || 0];
-
-  const now = Date.now();
-  // dt-abhängige EMA-Faktoren, damit die Erkennung von der Sensorrate unabhängig ist
-  const dt = lastMotionTs ? Math.min((now - lastMotionTs) / 1000, 0.2) : 1 / 60;
-  lastMotionTs = now;
-  const aSlow = 1 - Math.exp(-dt / TAU_SLOW);
-  const aFast = 1 - Math.exp(-dt / TAU_FAST);
-
-  if (dSlow === null) { dSlow = vec.slice(); dFast = vec.slice(); return; }
-
-  const d = [0, 0, 0];
-  for (let k = 0; k < 3; k++) {
-    dSlow[k] += aSlow * (vec[k] - dSlow[k]);
-    dFast[k] += aFast * (vec[k] - dFast[k]);
-    d[k] = dFast[k] - dSlow[k];            // Bandpass = entrauscht − Basis
+function timerTick() {
+  const elapsed = Date.now() - timerStartTime;
+  const minutes = Math.floor(elapsed / 60000);
+  if (minutes > timerMinutesFired) {
+    timerMinutesFired = minutes; // verpasste Minuten nur einmal nachholen
+    if (navigator.vibrate) navigator.vibrate(MINUTE_VIBRATE);
   }
-
-  // Hauptrichtung uDir langsam Richtung Abweichung ziehen (vorzeichen-konsistent)
-  const nd = Math.hypot(d[0], d[1], d[2]) + 1e-9;
-  const sign = (d[0]*uDir[0] + d[1]*uDir[1] + d[2]*uDir[2]) < 0 ? -1 : 1;
-  for (let k = 0; k < 3; k++) uDir[k] += U_ADAPT * (sign * d[k] / nd - uDir[k]);
-  const nu = Math.hypot(uDir[0], uDir[1], uDir[2]) + 1e-9;
-
-  // Projektion = orientierungsunabhängiges Atemsignal
-  const s = (d[0]*uDir[0] + d[1]*uDir[1] + d[2]*uDir[2]) / nu;
-  env += ENV_ADAPT * (Math.abs(s) - env);
-  const thr = THR_FRAC * env;
-
-  const rising = s > prevS;
-  // Scheitel (lokales Maximum über Schwelle) = ein Atemzug
-  if (sRising && !rising && prevS > thr && prevS > 0.1 && (now - lastPeakTime) > MIN_PEAK_INTERVAL) {
-    if (lastTroughT !== null) recordPhase(risePhases, now - lastTroughT); // Tal->Scheitel
-    registerBreath(now);
-    lastPeakTime = now;
-    lastPeakT = now;
-  }
-  // Tal (lokales Minimum unter −Schwelle) = Grenze für Phasentiming
-  if (!sRising && rising && prevS < -thr && (now - lastTroughTime) > MIN_HALF_PHASE) {
-    if (lastPeakT !== null) recordPhase(fallPhases, now - lastPeakT);   // Scheitel->Tal
-    lastTroughTime = now;
-    lastTroughT = now;
-  }
-  sRising = rising;
-  prevS = s;
+  timerDisplay.textContent = minutes;
 }
 
-function recordPhase(arr, dur) {
-  if (dur < PHASE_MIN || dur > PHASE_MAX) return; // unplausible Halbphase verwerfen
-  arr.push(dur);
-  if (arr.length > 5) arr.shift();
-}
-
-function updatePhaseDisplay() {
-  // erst anzeigen, wenn beide Halbphasen mehrfach sauber gemessen wurden
-  if (risePhases.length >= 2 && fallPhases.length >= 2) {
-    const avg = a => a.reduce((x, y) => x + y, 0) / a.length / 1000;
-    const p1 = avg(risePhases), p2 = avg(fallPhases);
-    const ein = Math.min(p1, p2); // in Ruhe kürzere Phase = Einatmen
-    const aus = Math.max(p1, p2); // längere Phase = Ausatmen
-    phaseLine.innerHTML =
-      `Einatmen <span class="val">~${ein.toFixed(1)} s</span> · ` +
-      `Ausatmen <span class="val">~${aus.toFixed(1)} s</span>`;
-    phaseLine.classList.remove('hidden');
-  }
-}
-
-function registerBreath(now) {
-  breathCount++;
-  breathCountDisplay.textContent = breathCount;
-  if (navigator.vibrate) navigator.vibrate(30);
-
-  // Rate aus Gesamtzahl/Zeit statt Momentan-Intervallen: robuster gegen
-  // vereinzelte Doppel-Peaks und Lücken (ab ~20 s stabil).
-  const elapsedMin = (now - sessionStart) / 60000;
-  if (elapsedMin > 0.33) {
-    rateLine.textContent = `${Math.round(breathCount / elapsedMin)} / Min`;
-  }
-  updatePhaseDisplay();
-  measureStats.textContent = `${elapsedMin.toFixed(1)} Min gemessen`;
-}
-
-async function startMeasuring() {
-  // iOS 13+ benötigt explizite Erlaubnis
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    try {
-      const permission = await DeviceMotionEvent.requestPermission();
-      if (permission !== 'granted') {
-        measureStats.textContent = 'Zugriff auf Bewegungssensor wurde nicht erlaubt.';
-        return;
-      }
-    } catch (err) {
-      measureStats.textContent = 'Bewegungssensor nicht verfügbar.';
-      return;
-    }
-  }
-  if (!('DeviceMotionEvent' in window)) {
-    measureStats.textContent = 'Dieses Gerät unterstützt keine Bewegungsmessung.';
-    return;
-  }
-
-  measuring = true;
-  dSlow = null;
-  dFast = null;
-  uDir = [0, 0, 0];
-  env = 0;
-  prevS = 0;
-  sRising = false;
-  lastMotionTs = 0;
-  lastPeakTime = 0;
-  breathCount = 0;
-  lastTroughTime = 0;
-  lastPeakT = null;
-  lastTroughT = null;
-  risePhases = [];
-  fallPhases = [];
-  sessionStart = Date.now();
-  breathCountDisplay.textContent = '0';
-  rateLine.textContent = '– / Min';
-  phaseLine.classList.add('hidden');
-  phaseLine.textContent = '';
-  measureStats.textContent = 'Messung läuft …';
-  measureToggleBtn.textContent = 'Messung stoppen';
+function startTimer() {
+  timerRunning = true;
+  timerStartTime = Date.now();
+  timerMinutesFired = 0;
+  timerDisplay.textContent = '0';
+  timerStats.textContent = '';
+  document.body.classList.add('timer-running');
+  timerToggleBtn.textContent = 'Stopp';
   requestWakeLock();
-  window.addEventListener('devicemotion', motionHandler);
+  if (navigator.vibrate) navigator.vibrate(80); // kurzes Startsignal
+  timerIntervalId = setInterval(timerTick, 250);
 }
 
-function stopMeasuring() {
-  measuring = false;
-  window.removeEventListener('devicemotion', motionHandler);
+function stopTimer() {
+  if (!timerRunning) return;
+  timerRunning = false;
+  clearInterval(timerIntervalId);
+  document.body.classList.remove('timer-running');
   releaseWakeLock();
-  measureToggleBtn.textContent = 'Messung starten';
+  timerToggleBtn.textContent = 'Start';
+  const elapsed = Date.now() - timerStartTime;
+  const m = Math.floor(elapsed / 60000);
+  const s = Math.floor((elapsed % 60000) / 1000);
+  timerStats.textContent = `Gestoppt nach ${m}:${String(s).padStart(2, '0')} Min`;
 }
 
-function resetMeasuring() {
-  stopMeasuring();
-  breathCount = 0;
-  breathCountDisplay.textContent = '0';
-  rateLine.textContent = '– / Min';
-  phaseLine.classList.add('hidden');
-  phaseLine.textContent = '';
-  measureStats.textContent = '';
+function resetTimer() {
+  stopTimer();
+  timerDisplay.textContent = '0';
+  timerStats.textContent = '';
 }
 
-measureToggleBtn.addEventListener('click', () => {
-  if (measuring) {
-    stopMeasuring();
+timerToggleBtn.addEventListener('click', () => {
+  if (timerRunning) {
+    stopTimer();
   } else {
-    startMeasuring();
+    startTimer();
   }
 });
 
-measureResetBtn.addEventListener('click', resetMeasuring);
-
-// ---------- Rohdaten-Aufzeichnung (Debug) ----------
-const recordToggleBtn = document.getElementById('recordToggleBtn');
-const recordStats = document.getElementById('recordStats');
-const recordOutput = document.getElementById('recordOutput');
-const downloadLink = document.getElementById('downloadLink');
-
-let recording = false;
-let recordedSamples = [];
-let recordStart = 0;
-const MAX_SAMPLES = 4000; // Sicherheitsgrenze
-
-function recordHandler(event) {
-  if (recordedSamples.length >= MAX_SAMPLES) {
-    stopRecording();
-    return;
-  }
-  const acc = event.acceleration || {};
-  const accG = event.accelerationIncludingGravity || {};
-  const rot = event.rotationRate || {};
-  recordedSamples.push({
-    t: Date.now() - recordStart,
-    ax: acc.x, ay: acc.y, az: acc.z,
-    gx: accG.x, gy: accG.y, gz: accG.z,
-    rax: rot.alpha, rbeta: rot.beta, rgamma: rot.gamma
-  });
-  if (recordedSamples.length % 20 === 0) {
-    recordStats.textContent = `${recordedSamples.length} Samples aufgezeichnet …`;
-  }
-}
-
-async function startRecording() {
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    try {
-      const permission = await DeviceMotionEvent.requestPermission();
-      if (permission !== 'granted') {
-        recordStats.textContent = 'Zugriff auf Bewegungssensor wurde nicht erlaubt.';
-        return;
-      }
-    } catch (err) {
-      recordStats.textContent = 'Bewegungssensor nicht verfügbar.';
-      return;
-    }
-  }
-  if (!('DeviceMotionEvent' in window)) {
-    recordStats.textContent = 'Dieses Gerät unterstützt keine Bewegungsmessung.';
-    return;
-  }
-
-  recording = true;
-  recordedSamples = [];
-  recordStart = Date.now();
-  recordOutput.value = '';
-  downloadLink.classList.add('hidden');
-  recordStats.textContent = 'Aufzeichnung läuft … Handy jetzt auf den Bauch legen.';
-  recordToggleBtn.textContent = 'Aufzeichnung stoppen';
-  requestWakeLock();
-  window.addEventListener('devicemotion', recordHandler);
-}
-
-function stopRecording() {
-  recording = false;
-  window.removeEventListener('devicemotion', recordHandler);
-  releaseWakeLock();
-  recordToggleBtn.textContent = 'Aufzeichnung starten';
-
-  if (recordedSamples.length === 0) {
-    recordStats.textContent = 'Keine Daten erfasst — Sensor evtl. nicht verfügbar.';
-    return;
-  }
-
-  const header = 't_ms,ax,ay,az,gx,gy,gz,rot_alpha,rot_beta,rot_gamma';
-  const rows = recordedSamples.map(s =>
-    [s.t, s.ax, s.ay, s.az, s.gx, s.gy, s.gz, s.rax, s.rbeta, s.rgamma]
-      .map(v => (v === null || v === undefined) ? '' : (typeof v === 'number' ? v.toFixed(4) : v))
-      .join(',')
-  );
-  const csv = [header, ...rows].join('\n');
-
-  recordOutput.value = csv;
-  recordStats.textContent = `${recordedSamples.length} Samples über ${(recordedSamples[recordedSamples.length-1].t/1000).toFixed(1)}s. In das Textfeld tippen und alles kopieren, oder CSV herunterladen.`;
-
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  downloadLink.href = url;
-  downloadLink.classList.remove('hidden');
-}
-
-recordToggleBtn.addEventListener('click', () => {
-  if (recording) {
-    stopRecording();
-  } else {
-    startRecording();
-  }
-});
+timerResetBtn.addEventListener('click', resetTimer);
 
 // ---------- PWA: Service Worker registrieren (installierbar/offline) ----------
 if ('serviceWorker' in navigator) {
