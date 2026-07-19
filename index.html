@@ -196,11 +196,14 @@
     /* großzügige Trefferfläche fürs Antippen am Handgelenk */
     padding: 12px 0;
     margin: 0;
+    /* --fill = eingestellter Wert in %, wird per JS gesetzt und füllt die
+       Spur bis zum Regler sichtbar aus */
+    --fill: 0%;
   }
   input[type=range]::-webkit-slider-runnable-track {
     height: 12px;
     border-radius: 8px;
-    background: rgba(111,168,220,0.25);
+    background: linear-gradient(to right, var(--circle) var(--fill), rgba(111,168,220,0.25) var(--fill));
     border: 1px solid rgba(111,168,220,0.4);
   }
   input[type=range]::-moz-range-track {
@@ -208,6 +211,11 @@
     border-radius: 8px;
     background: rgba(111,168,220,0.25);
     border: 1px solid rgba(111,168,220,0.4);
+  }
+  input[type=range]::-moz-range-progress {
+    height: 12px;
+    border-radius: 8px;
+    background: var(--circle);
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -261,27 +269,10 @@
     max-width: 320px;
     padding: 0 16px;
   }
-  .timer-instructions {
-    font-size: 0.95rem;
-    line-height: 1.5;
-    color: rgba(232,240,248,0.8);
-    margin-bottom: 24px;
-  }
   .timer-display {
     font-size: 3.4rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-  }
-  .timer-unit {
-    font-size: 0.85rem;
-    color: rgba(232,240,248,0.5);
-    margin-top: 2px;
-  }
-  .timer-stats {
-    margin-top: 18px;
-    font-size: 0.85rem;
-    color: rgba(232,240,248,0.55);
-    min-height: 1.2em;
   }
   /* Läuft der Minutentakt: fast schwarzer Bildschirm (OLED-schonend, wenig
      Ablenkung), nur eine gedimmte Minutenanzeige und die Bedienung bleiben. */
@@ -292,11 +283,8 @@
     overflow: hidden;
   }
   body.timer-running .mode-switch,
-  body.timer-running .info,
-  body.timer-running .timer-instructions { display: none !important; }
+  body.timer-running .info { display: none !important; }
   body.timer-running .timer-display { color: rgba(232,240,248,0.35); }
-  body.timer-running .timer-unit,
-  body.timer-running .timer-stats { color: rgba(232,240,248,0.2); }
   body.timer-running .timer-panel button {
     background: transparent;
     border-color: rgba(111,168,220,0.25);
@@ -307,12 +295,12 @@
 <body>
 
 <div class="mode-switch">
-  <span>Geführt</span>
-  <div class="switch" id="modeSwitch"></div>
   <span>Minutentakt</span>
+  <div class="switch" id="modeSwitch"></div>
+  <span>Geführt</span>
 </div>
 
-<div id="guidedPanel">
+<div id="guidedPanel" class="hidden">
   <div class="stage">
     <div class="ring" id="maxRing"></div>
     <div class="ring" id="minRing"></div>
@@ -347,18 +335,15 @@
   </div>
 </div>
 
-<div id="timerPanel" class="timer-panel hidden">
-  <div class="timer-instructions">Zeitgefühl-Training: bei jeder vollen Minute ab Start vibriert das Handy kräftig. Der Bildschirm bleibt dafür an (stark abgedunkelt) — im Sperrzustand kann eine Web-App nicht vibrieren.</div>
+<div id="timerPanel" class="timer-panel">
   <div class="timer-display" id="timerDisplay">0</div>
-  <div class="timer-unit">Minuten</div>
-  <div class="timer-stats" id="timerStats"></div>
   <div class="controls">
     <button id="timerToggleBtn">Start</button>
     <button id="timerResetBtn">Reset</button>
   </div>
 </div>
 
-<div class="info" id="infoText">Folge dem Rhythmus: Vibration zu Beginn jeder Phase — ein langer Impuls fürs Einatmen, zwei kurze fürs Ausatmen. Längen unten einstellbar.</div>
+<div class="info" id="infoText"></div>
 
 <script>
 const circle = document.getElementById('circle');
@@ -507,11 +492,19 @@ function fmtSeconds(v) {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
+// Füllt die Slider-Spur bis zum Regler (sichtbarer Balken für den Wert)
+function paintRange(el) {
+  const min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
+  el.style.setProperty('--fill', `${((v - min) / (max - min)) * 100}%`);
+}
+
 function applyConfigToUI() {
   inhaleRange.value = config.inhale;
   exhaleRange.value = config.exhale;
   inhaleVal.textContent = fmtSeconds(config.inhale);
   exhaleVal.textContent = fmtSeconds(config.exhale);
+  paintRange(inhaleRange);
+  paintRange(exhaleRange);
 }
 
 function saveConfig() {
@@ -523,11 +516,13 @@ function saveConfig() {
 inhaleRange.addEventListener('input', () => {
   config.inhale = parseFloat(inhaleRange.value);
   inhaleVal.textContent = fmtSeconds(config.inhale);
+  paintRange(inhaleRange);
   saveConfig();
 });
 exhaleRange.addEventListener('input', () => {
   config.exhale = parseFloat(exhaleRange.value);
   exhaleVal.textContent = fmtSeconds(config.exhale);
+  paintRange(exhaleRange);
   saveConfig();
 });
 
@@ -539,19 +534,20 @@ const guidedPanel = document.getElementById('guidedPanel');
 const timerPanel = document.getElementById('timerPanel');
 const infoText = document.getElementById('infoText');
 
+// Minutentakt ist der Standard (Switch links/aus); "on" schaltet auf Geführt.
 modeSwitch.addEventListener('click', () => {
-  const toTimer = !modeSwitch.classList.contains('on');
-  modeSwitch.classList.toggle('on', toTimer);
-  if (toTimer) {
-    if (running) pause();
-    guidedPanel.classList.add('hidden');
-    timerPanel.classList.remove('hidden');
-    infoText.textContent = 'Zeitgefühl-Training: das Handy vibriert bei jeder vollen Minute ab Start.';
-  } else {
+  const toGuided = !modeSwitch.classList.contains('on');
+  modeSwitch.classList.toggle('on', toGuided);
+  if (toGuided) {
     stopTimer();
     timerPanel.classList.add('hidden');
     guidedPanel.classList.remove('hidden');
     infoText.textContent = 'Folge dem Rhythmus: Vibration zu Beginn jeder Phase — ein langer Impuls fürs Einatmen, zwei kurze fürs Ausatmen. Längen unten einstellbar.';
+  } else {
+    if (running) pause();
+    guidedPanel.classList.add('hidden');
+    timerPanel.classList.remove('hidden');
+    infoText.textContent = '';
   }
 });
 
@@ -564,7 +560,6 @@ modeSwitch.addEventListener('click', () => {
 // Wake Lock den Bildschirm an, und die Anzeige wird stattdessen stark
 // abgedunkelt (OLED-schonend auf dem Pixel 4).
 const timerDisplay = document.getElementById('timerDisplay');
-const timerStats = document.getElementById('timerStats');
 const timerToggleBtn = document.getElementById('timerToggleBtn');
 const timerResetBtn = document.getElementById('timerResetBtn');
 
@@ -589,7 +584,6 @@ function startTimer() {
   timerStartTime = Date.now();
   timerMinutesFired = 0;
   timerDisplay.textContent = '0';
-  timerStats.textContent = '';
   document.body.classList.add('timer-running');
   timerToggleBtn.textContent = 'Stopp';
   requestWakeLock();
@@ -604,16 +598,11 @@ function stopTimer() {
   document.body.classList.remove('timer-running');
   releaseWakeLock();
   timerToggleBtn.textContent = 'Start';
-  const elapsed = Date.now() - timerStartTime;
-  const m = Math.floor(elapsed / 60000);
-  const s = Math.floor((elapsed % 60000) / 1000);
-  timerStats.textContent = `Gestoppt nach ${m}:${String(s).padStart(2, '0')} Min`;
 }
 
 function resetTimer() {
   stopTimer();
   timerDisplay.textContent = '0';
-  timerStats.textContent = '';
 }
 
 timerToggleBtn.addEventListener('click', () => {
