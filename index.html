@@ -283,6 +283,7 @@
     overflow: hidden;
   }
   body.timer-running .mode-switch,
+  body.timer-running #timerSettings,
   body.timer-running .info { display: none !important; }
   body.timer-running .timer-display { color: rgba(232,240,248,0.35); }
   body.timer-running .timer-panel button {
@@ -340,6 +341,23 @@
   <div class="controls">
     <button id="timerToggleBtn">Start</button>
     <button id="timerResetBtn">Reset</button>
+  </div>
+
+  <div class="settings" id="timerSettings">
+    <div class="setting-row">
+      <div class="setting-head">
+        <span>Intervall</span>
+        <span class="setting-val" id="intervalVal">1 min</span>
+      </div>
+      <input type="range" id="intervalRange" min="0" max="3" step="1" value="1">
+    </div>
+    <div class="setting-row">
+      <div class="setting-head">
+        <span>Vibrationslänge</span>
+        <span class="setting-val"><span id="vibLenVal">200</span> ms</span>
+      </div>
+      <input type="range" id="vibLenRange" min="100" max="400" step="20" value="200">
+    </div>
   </div>
 </div>
 
@@ -563,30 +581,45 @@ const timerDisplay = document.getElementById('timerDisplay');
 const timerToggleBtn = document.getElementById('timerToggleBtn');
 const timerResetBtn = document.getElementById('timerResetBtn');
 
-// Ein langer Impuls, dann ein kurzer, der verklingt: jede Minute kommt nicht
-// wieder und "stirbt" ein Stück. Das Nachlassen der Vibration (lang → kurz)
-// steht für die schwindende, schwächer werdende Zeit. Die Vibration-API kennt
-// nur Dauer, keine Stärke — deshalb wird "schwächer" über die Länge erzählt.
-const MINUTE_VIBRATE = [400, 150, 150];
+// Takt und Vibrationslänge sind einstellbar. Das Intervall kommt aus einer
+// festen Auswahl (30 s / 1 / 2 / 5 min); die Vibrationslänge ist ein einzelner
+// Impuls zwischen 100 und 400 ms — kurz genug, um nicht zu stören, lang genug,
+// um am Handgelenk sicher spürbar zu sein. Die Web-Vibration-API kennt nur
+// Dauer, keine Stärke — deshalb wird die Intensität über die Länge geregelt.
+const INTERVAL_OPTIONS = [30, 60, 120, 300]; // Sekunden, passend zum Slider-Index
+const TIMER_STORAGE_KEY = 'atem_timer_config';
+const timerConfig = { intervalSec: 60, vibrateMs: 200 };
+try {
+  const saved = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY));
+  if (saved && INTERVAL_OPTIONS.includes(saved.intervalSec) &&
+      typeof saved.vibrateMs === 'number') {
+    timerConfig.intervalSec = saved.intervalSec;
+    timerConfig.vibrateMs = saved.vibrateMs;
+  }
+} catch (err) { /* ungültige/leere Konfiguration – Defaults verwenden */ }
+
 let timerRunning = false;
 let timerStartTime = 0;
-let timerMinutesFired = 0;
+let timerTicksFired = 0;
 let timerIntervalId = null;
 
 function timerTick() {
   const elapsed = Date.now() - timerStartTime;
-  const minutes = Math.floor(elapsed / 60000);
-  if (minutes > timerMinutesFired) {
-    timerMinutesFired = minutes; // verpasste Minuten nur einmal nachholen
-    if (navigator.vibrate) navigator.vibrate(MINUTE_VIBRATE);
+  const intervalMs = timerConfig.intervalSec * 1000;
+  // Takt aus der verstrichenen Zeit ableiten (nicht aus gezählten Ticks):
+  // drosselt der Browser den Timer, stimmt der Rhythmus beim nächsten Tick wieder.
+  const ticks = Math.floor(elapsed / intervalMs);
+  if (ticks > timerTicksFired) {
+    timerTicksFired = ticks; // verpasste Intervalle nur einmal nachholen
+    if (navigator.vibrate) navigator.vibrate([timerConfig.vibrateMs]);
   }
-  timerDisplay.textContent = minutes;
+  timerDisplay.textContent = ticks;
 }
 
 function startTimer() {
   timerRunning = true;
   timerStartTime = Date.now();
-  timerMinutesFired = 0;
+  timerTicksFired = 0;
   timerDisplay.textContent = '0';
   document.body.classList.add('timer-running');
   timerToggleBtn.textContent = 'Stopp';
@@ -618,6 +651,49 @@ timerToggleBtn.addEventListener('click', () => {
 });
 
 timerResetBtn.addEventListener('click', resetTimer);
+
+// ---------- Einstellungen: Intervall & Vibrationslänge ----------
+const intervalRange = document.getElementById('intervalRange');
+const vibLenRange = document.getElementById('vibLenRange');
+const intervalVal = document.getElementById('intervalVal');
+const vibLenVal = document.getElementById('vibLenVal');
+
+function fmtInterval(sec) {
+  // unter einer Minute in Sekunden, sonst in Minuten
+  return sec < 60 ? `${sec} s` : `${sec / 60} min`;
+}
+
+function saveTimerConfig() {
+  try {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerConfig));
+  } catch (err) { /* Speicher nicht verfügbar – Einstellung gilt nur für diese Sitzung */ }
+}
+
+function applyTimerConfigToUI() {
+  intervalRange.value = INTERVAL_OPTIONS.indexOf(timerConfig.intervalSec);
+  vibLenRange.value = timerConfig.vibrateMs;
+  intervalVal.textContent = fmtInterval(timerConfig.intervalSec);
+  vibLenVal.textContent = timerConfig.vibrateMs;
+  paintRange(intervalRange);
+  paintRange(vibLenRange);
+}
+
+intervalRange.addEventListener('input', () => {
+  timerConfig.intervalSec = INTERVAL_OPTIONS[parseInt(intervalRange.value, 10)];
+  intervalVal.textContent = fmtInterval(timerConfig.intervalSec);
+  paintRange(intervalRange);
+  saveTimerConfig();
+});
+vibLenRange.addEventListener('input', () => {
+  timerConfig.vibrateMs = parseInt(vibLenRange.value, 10);
+  vibLenVal.textContent = timerConfig.vibrateMs;
+  paintRange(vibLenRange);
+  // kurzes Probe-Feedback beim Einstellen, damit die Länge spürbar wird
+  if (navigator.vibrate) navigator.vibrate([timerConfig.vibrateMs]);
+  saveTimerConfig();
+});
+
+applyTimerConfigToUI();
 
 // ---------- PWA: Service Worker registrieren (installierbar/offline) ----------
 if ('serviceWorker' in navigator) {
