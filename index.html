@@ -563,11 +563,9 @@ const timerDisplay = document.getElementById('timerDisplay');
 const timerToggleBtn = document.getElementById('timerToggleBtn');
 const timerResetBtn = document.getElementById('timerResetBtn');
 
-// Ein langer Impuls, dann ein kurzer, der verklingt: jede Minute kommt nicht
-// wieder und "stirbt" ein Stück. Das Nachlassen der Vibration (lang → kurz)
-// steht für die schwindende, schwächer werdende Zeit. Die Vibration-API kennt
-// nur Dauer, keine Stärke — deshalb wird "schwächer" über die Länge erzählt.
-const MINUTE_VIBRATE = [400, 150, 150];
+// Ein einzelner, klarer Impuls von 200 ms zu jeder vollen Minute: kurz genug,
+// um nicht zu stören, lang genug, um am Handgelenk sicher spürbar zu sein.
+const MINUTE_VIBRATE = [200];
 let timerRunning = false;
 let timerStartTime = 0;
 let timerMinutesFired = 0;
