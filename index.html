@@ -346,17 +346,10 @@
   <div class="settings" id="timerSettings">
     <div class="setting-row">
       <div class="setting-head">
-        <span>Intervall</span>
-        <span class="setting-val" id="intervalVal">1 min</span>
-      </div>
-      <input type="range" id="intervalRange" min="0" max="3" step="1" value="1">
-    </div>
-    <div class="setting-row">
-      <div class="setting-head">
         <span>Vibrationslänge</span>
         <span class="setting-val"><span id="vibLenVal">200</span> ms</span>
       </div>
-      <input type="range" id="vibLenRange" min="100" max="400" step="20" value="200">
+      <input type="range" id="vibLenRange" min="100" max="800" step="100" value="200">
     </div>
   </div>
 </div>
@@ -581,20 +574,22 @@ const timerDisplay = document.getElementById('timerDisplay');
 const timerToggleBtn = document.getElementById('timerToggleBtn');
 const timerResetBtn = document.getElementById('timerResetBtn');
 
-// Takt und Vibrationslänge sind einstellbar. Das Intervall kommt aus einer
-// festen Auswahl (30 s / 1 / 2 / 5 min); die Vibrationslänge ist ein einzelner
-// Impuls zwischen 100 und 400 ms — kurz genug, um nicht zu stören, lang genug,
-// um am Handgelenk sicher spürbar zu sein. Die Web-Vibration-API kennt nur
-// Dauer, keine Stärke — deshalb wird die Intensität über die Länge geregelt.
-const INTERVAL_OPTIONS = [30, 60, 120, 300]; // Sekunden, passend zum Slider-Index
+// Der Takt ist fest auf eine Minute eingestellt; einstellbar ist nur die
+// Vibrationslänge — ein einzelner Impuls zwischen 100 und 800 ms in
+// 100-ms-Schritten, kurz genug, um nicht zu stören, lang genug, um am
+// Handgelenk sicher spürbar zu sein. Die Web-Vibration-API kennt nur Dauer,
+// keine Stärke — deshalb wird die Intensität über die Länge geregelt.
+const INTERVAL_SEC = 60; // fester Minutentakt
+const VIB_MIN_MS = 100;
+const VIB_MAX_MS = 800;
 const TIMER_STORAGE_KEY = 'atem_timer_config';
-const timerConfig = { intervalSec: 60, vibrateMs: 200 };
+const timerConfig = { intervalSec: INTERVAL_SEC, vibrateMs: 200 };
 try {
   const saved = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY));
-  if (saved && INTERVAL_OPTIONS.includes(saved.intervalSec) &&
-      typeof saved.vibrateMs === 'number') {
-    timerConfig.intervalSec = saved.intervalSec;
-    timerConfig.vibrateMs = saved.vibrateMs;
+  if (saved && typeof saved.vibrateMs === 'number') {
+    // auf gültigen Bereich und 100-ms-Raster bringen (auch alte Werte)
+    const clamped = Math.min(VIB_MAX_MS, Math.max(VIB_MIN_MS, saved.vibrateMs));
+    timerConfig.vibrateMs = Math.round(clamped / 100) * 100;
   }
 } catch (err) { /* ungültige/leere Konfiguration – Defaults verwenden */ }
 
@@ -652,16 +647,10 @@ timerToggleBtn.addEventListener('click', () => {
 
 timerResetBtn.addEventListener('click', resetTimer);
 
-// ---------- Einstellungen: Intervall & Vibrationslänge ----------
-const intervalRange = document.getElementById('intervalRange');
+// ---------- Einstellungen: Vibrationslänge ----------
+// Der Takt ist fest (eine Minute); einstellbar ist nur noch die Vibrationslänge.
 const vibLenRange = document.getElementById('vibLenRange');
-const intervalVal = document.getElementById('intervalVal');
 const vibLenVal = document.getElementById('vibLenVal');
-
-function fmtInterval(sec) {
-  // unter einer Minute in Sekunden, sonst in Minuten
-  return sec < 60 ? `${sec} s` : `${sec / 60} min`;
-}
 
 function saveTimerConfig() {
   try {
@@ -670,20 +659,11 @@ function saveTimerConfig() {
 }
 
 function applyTimerConfigToUI() {
-  intervalRange.value = INTERVAL_OPTIONS.indexOf(timerConfig.intervalSec);
   vibLenRange.value = timerConfig.vibrateMs;
-  intervalVal.textContent = fmtInterval(timerConfig.intervalSec);
   vibLenVal.textContent = timerConfig.vibrateMs;
-  paintRange(intervalRange);
   paintRange(vibLenRange);
 }
 
-intervalRange.addEventListener('input', () => {
-  timerConfig.intervalSec = INTERVAL_OPTIONS[parseInt(intervalRange.value, 10)];
-  intervalVal.textContent = fmtInterval(timerConfig.intervalSec);
-  paintRange(intervalRange);
-  saveTimerConfig();
-});
 vibLenRange.addEventListener('input', () => {
   timerConfig.vibrateMs = parseInt(vibLenRange.value, 10);
   vibLenVal.textContent = timerConfig.vibrateMs;
