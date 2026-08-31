@@ -340,7 +340,6 @@
   <div class="timer-display" id="timerDisplay">0</div>
   <div class="controls">
     <button id="timerToggleBtn">Start</button>
-    <button id="timerResetBtn">Reset</button>
   </div>
 
   <div class="settings" id="timerSettings">
@@ -572,7 +571,6 @@ modeSwitch.addEventListener('click', () => {
 // abgedunkelt (OLED-schonend auf dem Pixel 4).
 const timerDisplay = document.getElementById('timerDisplay');
 const timerToggleBtn = document.getElementById('timerToggleBtn');
-const timerResetBtn = document.getElementById('timerResetBtn');
 
 // Der Takt ist fest auf eine Minute eingestellt; einstellbar ist nur die
 // Vibrationslänge — ein einzelner Impuls zwischen 100 und 800 ms in
@@ -630,10 +628,7 @@ function stopTimer() {
   document.body.classList.remove('timer-running');
   releaseWakeLock();
   timerToggleBtn.textContent = 'Start';
-}
-
-function resetTimer() {
-  stopTimer();
+  // Stopp setzt zugleich auf 0 zurück – ein separater Reset ist damit unnötig.
   timerDisplay.textContent = '0';
 }
 
@@ -644,8 +639,6 @@ timerToggleBtn.addEventListener('click', () => {
     startTimer();
   }
 });
-
-timerResetBtn.addEventListener('click', resetTimer);
 
 // ---------- Einstellungen: Vibrationslänge ----------
 // Der Takt ist fest (eine Minute); einstellbar ist nur noch die Vibrationslänge.
