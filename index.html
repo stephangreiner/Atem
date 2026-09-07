@@ -66,20 +66,23 @@
     body { padding-bottom: 24px; }
   }
 
-  /* ---------- Zahnrad zum Öffnen der Einstellungen ---------- */
+  /* ---------- Zahnrad zum Öffnen der Einstellungen ----------
+     Oben zentriert (12-Uhr-Punkt): auf runden Uhren wie der Pixel Watch
+     erreichbar, während die Ecken vom Display abgeschnitten werden. */
   .gear-btn {
     position: absolute;
-    top: 18px;
-    right: 18px;
-    width: 44px;
-    height: 44px;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 48px;
+    height: 48px;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
   }
-  .gear-btn svg { width: 22px; height: 22px; }
+  .gear-btn svg { width: 24px; height: 24px; }
 
   /* ---------- Minutentakt-Anzeige ---------- */
   .timer-panel {
@@ -111,12 +114,6 @@
     height: min(180px, 46vmin);
     color: var(--circle-glow);
     filter: drop-shadow(0 0 18px rgba(111,168,220,0.35));
-  }
-  .bt-visual .bt-img {
-    max-width: min(300px, 82vw);
-    max-height: 46vh;
-    border-radius: 14px;
-    box-shadow: 0 0 34px rgba(0,0,0,0.5);
   }
   .bt-text {
     font-size: 1.35rem;
@@ -183,18 +180,28 @@
   .settings-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
     margin-bottom: 22px;
   }
   .settings-bar h1 {
     margin: 0;
     font-size: 1.15rem;
     font-weight: 600;
+    text-align: center;
   }
-  .settings-back { padding: 8px 16px; }
   .settings-body {
     max-width: 360px;
     margin: 0 auto;
+  }
+  /* „Fertig" schließt die Einstellungen: breiter Knopf unten in der Mitte
+     (6-Uhr-Punkt) – auf der runden Uhr gut erreichbar, anders als eine Ecke. */
+  .settings-done {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 14px;
+    border-radius: 22px;
+    font-size: 1rem;
   }
   .setting-row {
     display: flex;
@@ -286,36 +293,12 @@
     box-shadow: 0 0 10px rgba(111,168,220,0.7);
   }
 
-  /* Eigene Bilder */
-  .img-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-  .img-thumb {
-    position: relative;
-    width: 66px;
-    height: 66px;
-  }
-  .img-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 10px;
-    border: 1px solid rgba(111,168,220,0.4);
-  }
-  .img-thumb .del {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border-radius: 50%;
-    font-size: 0.9rem;
-    line-height: 1;
-    background: rgba(15,27,43,0.9);
+  /* ---------- Runde Uhr (z. B. Pixel Watch): Einstellungen ins Safe-Layout ----------
+     Mehr Seitenabstand, damit Inhalt nicht am runden Rand abgeschnitten wird;
+     der Titel rückt nach unten, wo der Kreis breit genug ist. */
+  @media (max-height: 480px), (max-width: 320px) {
+    .settings-page { padding: 34px 11% 22px; }
+    .settings-bar { margin-bottom: 16px; }
   }
 </style>
 </head>
@@ -342,12 +325,11 @@
   </div>
 </div>
 
-<div class="info" id="infoText">Vibriert bei jeder vollen Minute. Der Bildschirm bleibt an. Einstellungen über das Zahnrad oben rechts.</div>
+<div class="info" id="infoText">Vibriert bei jeder vollen Minute. Der Bildschirm bleibt an. Einstellungen über das Zahnrad oben.</div>
 
 <!-- ---------- Einstellungsseite ---------- -->
 <div id="settingsPage" class="settings-page hidden">
   <div class="settings-bar">
-    <button class="settings-back" id="settingsBack">‹ Zurück</button>
     <h1>Einstellungen</h1>
   </div>
   <div class="settings-body">
@@ -382,17 +364,10 @@
       <div class="segmented" id="btTypeSeg">
         <button data-val="text">Texte</button>
         <button data-val="symbol">Symbole</button>
-        <button data-val="image">Eigene Bilder</button>
       </div>
     </div>
 
-    <div class="setting-row hidden" id="btImageRow">
-      <div class="setting-head"><span>Eigene Bilder</span></div>
-      <div class="img-list" id="imgList"></div>
-      <button id="addImgBtn">Bilder hinzufügen</button>
-      <input type="file" id="imgInput" accept="image/*" multiple hidden>
-      <div class="setting-hint">Die Bilder werden nur auf diesem Gerät gespeichert und jede Minute der Reihe nach gezeigt.</div>
-    </div>
+    <button class="settings-done" id="settingsBack">Fertig</button>
 
   </div>
 </div>
@@ -433,14 +408,13 @@ const INTERVAL_SEC = 60; // fester Minutentakt
 const VIB_MIN_MS = 100;
 const VIB_MAX_MS = 800;
 const TIMER_STORAGE_KEY = 'atem_timer_config';
-const IMAGES_KEY = 'atem_bt_images';
 
 const timerConfig = {
   intervalSec: INTERVAL_SEC,
   vibrateMs: 200,
   vibratePattern: 'single',   // 'single' | 'double'
   displayMode: 'dark',        // 'dark' | 'brainteaser'
-  brainteaserType: 'text'     // 'text' | 'symbol' | 'image'
+  brainteaserType: 'text'     // 'text' | 'symbol'
 };
 
 try {
@@ -456,7 +430,7 @@ try {
     if (saved.displayMode === 'dark' || saved.displayMode === 'brainteaser') {
       timerConfig.displayMode = saved.displayMode;
     }
-    if (['text', 'symbol', 'image'].includes(saved.brainteaserType)) {
+    if (saved.brainteaserType === 'text' || saved.brainteaserType === 'symbol') {
       timerConfig.brainteaserType = saved.brainteaserType;
     }
   }
@@ -475,8 +449,7 @@ function buildVibration() {
 }
 
 // ---------- Brainteaser-Inhalte ----------
-// Meditations-Themen mit passendem Text und gezeichnetem Symbol. Der Modus
-// "Eigene Bilder" nutzt stattdessen die vom Nutzer hinzugefügten Fotos.
+// Meditations-Themen mit passendem Text und gezeichnetem Symbol.
 const BRAINTEASERS = [
   { theme: 'Atmung',          text: 'Spüre deinen Atem — wie er kommt und geht.',        symbol: 'breath' },
   { theme: 'Gegenwart',       text: 'Nur dieser Augenblick ist wirklich.',              symbol: 'present' },
@@ -509,20 +482,6 @@ function symbolSVG(key) {
     + 'stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
 }
 
-// Eigene Bilder als Data-URLs im localStorage.
-function loadImages() {
-  try {
-    const arr = JSON.parse(localStorage.getItem(IMAGES_KEY));
-    return Array.isArray(arr) ? arr : [];
-  } catch (err) { return []; }
-}
-
-function saveImages(arr) {
-  try {
-    localStorage.setItem(IMAGES_KEY, JSON.stringify(arr));
-  } catch (err) { /* Speicher voll oder nicht verfügbar */ }
-}
-
 // ---------- Minutentakt ----------
 // Vibriert bei jeder vollen Minute seit dem Start. Die Minuten werden aus der
 // Uhrzeit (Date.now) berechnet, nicht aus gezählten Ticks: drosselt der Browser
@@ -542,22 +501,6 @@ let timerIntervalId = null;
 
 function renderBrainteaser(tick) {
   const type = timerConfig.brainteaserType;
-
-  if (type === 'image') {
-    const imgs = loadImages();
-    if (!imgs.length) {
-      btVisual.innerHTML = '';
-      btText.textContent = 'Füge über das Zahnrad eigene Bilder hinzu.';
-      btTheme.textContent = '';
-      return;
-    }
-    const src = imgs[tick % imgs.length];
-    btVisual.innerHTML = '<img class="bt-img" src="' + src + '" alt="">';
-    btText.textContent = '';
-    btTheme.textContent = '';
-    return;
-  }
-
   const item = BRAINTEASERS[tick % BRAINTEASERS.length];
   if (type === 'symbol') {
     btVisual.innerHTML = symbolSVG(item.symbol);
@@ -670,12 +613,10 @@ setupSegmented('vibPatternSeg',
   });
 
 const btTypeRow = document.getElementById('btTypeRow');
-const btImageRow = document.getElementById('btImageRow');
 
 function updateBrainteaserRows() {
   const isBt = timerConfig.displayMode === 'brainteaser';
   btTypeRow.classList.toggle('hidden', !isBt);
-  btImageRow.classList.toggle('hidden', !(isBt && timerConfig.brainteaserType === 'image'));
 }
 
 setupSegmented('displayModeSeg',
@@ -694,61 +635,11 @@ setupSegmented('btTypeSeg',
     saveTimerConfig();
   });
 
-// ---------- Eigene Bilder ----------
-const imgList = document.getElementById('imgList');
-const addImgBtn = document.getElementById('addImgBtn');
-const imgInput = document.getElementById('imgInput');
-
-function renderImgList() {
-  const imgs = loadImages();
-  imgList.innerHTML = '';
-  imgs.forEach((src, i) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'img-thumb';
-    const img = document.createElement('img');
-    img.src = src;
-    const del = document.createElement('button');
-    del.className = 'del';
-    del.textContent = '×';
-    del.setAttribute('aria-label', 'Bild entfernen');
-    del.addEventListener('click', () => {
-      const arr = loadImages();
-      arr.splice(i, 1);
-      saveImages(arr);
-      renderImgList();
-    });
-    wrap.appendChild(img);
-    wrap.appendChild(del);
-    imgList.appendChild(wrap);
-  });
-}
-
-addImgBtn.addEventListener('click', () => imgInput.click());
-
-imgInput.addEventListener('change', () => {
-  const files = Array.from(imgInput.files || []);
-  let pending = files.length;
-  if (!pending) return;
-  files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arr = loadImages();
-      arr.push(reader.result);
-      saveImages(arr);
-      if (--pending === 0) renderImgList();
-    };
-    reader.onerror = () => { if (--pending === 0) renderImgList(); };
-    reader.readAsDataURL(file);
-  });
-  imgInput.value = ''; // gleiche Datei erneut wählbar machen
-});
-
 // ---------- Einstellungen initial anzeigen ----------
 vibLenRange.value = timerConfig.vibrateMs;
 vibLenVal.textContent = timerConfig.vibrateMs;
 paintRange(vibLenRange);
 updateBrainteaserRows();
-renderImgList();
 
 // ---------- PWA: Service Worker registrieren (installierbar/offline) ----------
 if ('serviceWorker' in navigator) {
