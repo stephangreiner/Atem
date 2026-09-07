@@ -34,73 +34,6 @@
     color: var(--text);
     overflow-x: hidden;
   }
-  /* Während der geführten Atmung: fixe, ruhige Bühne ohne Scrollen. */
-  body.running {
-    height: 100vh;
-    padding: 0;
-    overflow: hidden;
-    justify-content: center;
-  }
-  .stage {
-    /* --c = Basis-Durchmesser des Kreises; alles skaliert damit und passt so
-       vom Handy bis zur kleinen Uhr (Pixel Watch). */
-    --c: min(96px, 26vmin);
-    position: relative;
-    width: calc(var(--c) * 3.1);
-    height: calc(var(--c) * 3.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.5s ease;
-  }
-  .ring {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  #maxRing {
-    width: calc(var(--c) * 2.2);
-    height: calc(var(--c) * 2.2);
-    border: 1px dashed rgba(255,255,255,0.35);
-  }
-  #minRing {
-    width: calc(var(--c) * 1.07);
-    height: calc(var(--c) * 1.07);
-    border: 1px dashed rgba(255,255,255,0.25);
-  }
-  .circle {
-    width: var(--c);
-    height: var(--c);
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, var(--circle-glow), var(--circle));
-    box-shadow: 0 0 40px rgba(111,168,220,0.6);
-    transition: transform linear, box-shadow linear;
-  }
-  .phase-label {
-    margin-top: 36px;
-    font-size: 1.3rem;
-    letter-spacing: 0.05em;
-    font-weight: 500;
-    min-height: 1.6em;
-    text-align: center;
-  }
-  /* Startseite kompakt halten: Kreis und Phasen-Texte erst zeigen, wenn die
-     Übung läuft — vorher sind sie statisch und ohne Funktion (wichtig auf
-     kleinen Displays wie der Pixel Watch, damit nichts scrollen muss). */
-  body:not(.running) #guidedPanel .stage,
-  body:not(.running) #guidedPanel .phase-label,
-  body:not(.running) #guidedPanel .sub-label { display: none; }
-  .sub-label {
-    margin-top: 6px;
-    font-size: 0.9rem;
-    color: rgba(232,240,248,0.6);
-  }
-  .controls {
-    margin-top: 44px;
-    display: flex;
-    gap: 14px;
-    align-items: center;
-  }
   button {
     background: rgba(111,168,220,0.15);
     border: 1px solid rgba(111,168,220,0.4);
@@ -112,10 +45,11 @@
     transition: background 0.2s;
   }
   button:hover { background: rgba(111,168,220,0.3); }
-  .counter {
-    margin-top: 18px;
-    font-size: 0.85rem;
-    color: rgba(232,240,248,0.5);
+  .controls {
+    margin-top: 44px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
   }
   .info {
     margin-top: 28px;
@@ -126,78 +60,193 @@
     padding: 0 16px;
     pointer-events: none;
   }
-  /* Auf kleinen Displays (z. B. Pixel Watch) den Hinweistext ausblenden,
-     damit Kreis und Bedienelemente den Platz bekommen. */
+  /* Auf kleinen Displays (z. B. Pixel Watch) den Hinweistext ausblenden. */
   @media (max-height: 480px), (max-width: 320px) {
     .info { display: none; }
     body { padding-bottom: 24px; }
   }
-  .mode-switch {
+
+  /* ---------- Zahnrad zum Öffnen der Einstellungen ---------- */
+  .gear-btn {
     position: absolute;
-    top: 24px;
+    top: 18px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 0.85rem;
-    color: rgba(232,240,248,0.7);
-  }
-  .switch {
-    position: relative;
-    width: 50px;
-    height: 28px;
-    background: rgba(111,168,220,0.25);
-    border-radius: 16px;
-    cursor: pointer;
-    border: 1px solid rgba(111,168,220,0.4);
-    transition: background 0.2s;
-  }
-  .switch.on { background: rgba(111,168,220,0.6); }
-  .switch::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 22px;
-    height: 22px;
+    justify-content: center;
     border-radius: 50%;
-    background: var(--text);
-    transition: transform 0.2s;
   }
-  .switch.on::after { transform: translateX(22px); }
-  .settings {
-    margin-top: 26px;
-    width: 260px;
-    max-width: 80vw;
+  .gear-btn svg { width: 22px; height: 22px; }
+
+  /* ---------- Minutentakt-Anzeige ---------- */
+  .timer-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 340px;
+    padding: 0 16px;
+  }
+  .timer-display {
+    font-size: 3.4rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Brainteaser (Meditations-Ansicht) ---------- */
+  .brainteaser {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 340px;
+    margin-bottom: 8px;
+  }
+  .bt-visual { min-height: 0; }
+  .bt-visual svg {
+    width: min(180px, 46vmin);
+    height: min(180px, 46vmin);
+    color: var(--circle-glow);
+    filter: drop-shadow(0 0 18px rgba(111,168,220,0.35));
+  }
+  .bt-visual .bt-img {
+    max-width: min(300px, 82vw);
+    max-height: 46vh;
+    border-radius: 14px;
+    box-shadow: 0 0 34px rgba(0,0,0,0.5);
+  }
+  .bt-text {
+    font-size: 1.35rem;
+    line-height: 1.5;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .bt-theme {
+    margin-top: 16px;
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(164,200,232,0.7);
+  }
+
+  .hidden { display: none !important; }
+
+  /* Läuft der Minutentakt (dunkler Modus): fast schwarzer Bildschirm
+     (OLED-schonend, wenig Ablenkung), nur eine gedimmte Minutenanzeige. */
+  body.timer-running {
+    height: 100vh;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+  }
+  body.timer-running .gear-btn,
+  body.timer-running .info { display: none !important; }
+  body.timer-running .timer-display { color: rgba(232,240,248,0.35); }
+  body.timer-running .timer-panel button {
+    background: transparent;
+    border-color: rgba(111,168,220,0.25);
+    color: rgba(232,240,248,0.35);
+  }
+
+  /* Läuft der Minutentakt im Brainteaser-Modus: ruhiger dunkler Hintergrund,
+     der Denkanstoß steht im Mittelpunkt, die Minutenzahl bleibt klein. */
+  body.timer-running.bt-mode {
+    background: radial-gradient(circle at center, #16283f 0%, var(--bg) 70%);
+  }
+  body.timer-running.bt-mode .timer-display {
+    font-size: 1rem;
+    color: rgba(232,240,248,0.4);
+    margin-top: 22px;
+  }
+  body.timer-running.bt-mode .timer-panel button {
+    color: rgba(232,240,248,0.6);
+    border-color: rgba(111,168,220,0.4);
+  }
+
+  @media (max-height: 480px), (max-width: 320px) {
+    body.timer-running.bt-mode .bt-text { font-size: 1.05rem; }
+    body.timer-running.bt-mode .bt-theme { margin-top: 8px; }
+  }
+
+  /* ---------- Einstellungsseite ---------- */
+  .settings-page {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: radial-gradient(circle at center, #16283f 0%, var(--bg) 70%);
+    overflow-y: auto;
+    padding: 18px 18px 40px;
+  }
+  .settings-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .settings-bar h1 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .settings-back { padding: 8px 16px; }
+  .settings-body {
+    max-width: 360px;
+    margin: 0 auto;
   }
   .setting-row {
     display: flex;
     flex-direction: column;
-    margin-bottom: 16px;
+    margin-bottom: 24px;
   }
   .setting-head {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    font-size: 0.85rem;
-    margin-bottom: 6px;
-    color: rgba(232,240,248,0.75);
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    color: rgba(232,240,248,0.8);
   }
   .setting-val {
     color: var(--circle-glow);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
+  .setting-hint {
+    font-size: 0.75rem;
+    color: rgba(232,240,248,0.4);
+    margin-top: 8px;
+    line-height: 1.45;
+  }
+
+  /* Segmentierte Auswahl (Umschalt-Knöpfe) */
+  .segmented {
+    display: flex;
+    gap: 6px;
+  }
+  .segmented button {
+    flex: 1;
+    padding: 10px 6px;
+    font-size: 0.85rem;
+    border-radius: 14px;
+  }
+  .segmented button.active {
+    background: rgba(111,168,220,0.55);
+    border-color: rgba(164,200,232,0.7);
+    font-weight: 600;
+  }
+
+  /* Slider */
   input[type=range] {
     width: 100%;
     cursor: pointer;
     -webkit-appearance: none;
     appearance: none;
     background: transparent;
-    /* großzügige Trefferfläche fürs Antippen am Handgelenk */
     padding: 12px 0;
     margin: 0;
-    /* --fill = eingestellter Wert in %, wird per JS gesetzt und füllt die
-       Spur bis zum Regler sichtbar aus */
     --fill: 0%;
   }
   input[type=range]::-webkit-slider-runnable-track {
@@ -236,113 +285,73 @@
     border: 2px solid rgba(255,255,255,0.85);
     box-shadow: 0 0 10px rgba(111,168,220,0.7);
   }
-  .hidden { display: none !important; }
 
-  /* Während die geführte Atmung läuft: Bedienelemente ausblenden und den
-     pulsierenden Kreis maximal groß zeigen (weniger Ablenkung, gut am Handgelenk). */
-  body.running .mode-switch,
-  body.running .settings,
-  body.running .counter,
-  body.running .info { display: none !important; }
-  body.running .stage {
-    --c: min(150px, 34vmin);
-    /* enge Bühne: nur so groß wie der Kreis bei maximaler Ausdehnung braucht */
-    width: calc(var(--c) * 2.5);
-    height: calc(var(--c) * 2.5);
-  }
-  body.running .phase-label { margin-top: 18px; }
-  body.running .controls { margin-top: 18px; }
-
-  /* Pixel Watch & Co.: kompakter, damit Kreis + Label + Pause zusammen passen */
-  @media (max-height: 480px), (max-width: 320px) {
-    body.running .stage { --c: 30vmin; }
-    body.running .phase-label { margin-top: 8px; font-size: 1.05rem; }
-    body.running .sub-label { display: none; }
-    body.running .controls { margin-top: 8px; gap: 8px; }
-    body.running button { padding: 7px 14px; font-size: 0.8rem; }
-  }
-  .timer-panel {
+  /* Eigene Bilder */
+  .img-list {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    max-width: 320px;
-    padding: 0 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
   }
-  .timer-display {
-    font-size: 3.4rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+  .img-thumb {
+    position: relative;
+    width: 66px;
+    height: 66px;
   }
-  /* Läuft der Minutentakt: fast schwarzer Bildschirm (OLED-schonend, wenig
-     Ablenkung), nur eine gedimmte Minutenanzeige und die Bedienung bleiben. */
-  body.timer-running {
-    background: #000;
-    height: 100vh;
+  .img-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid rgba(111,168,220,0.4);
+  }
+  .img-thumb .del {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
     padding: 0;
-    overflow: hidden;
-  }
-  body.timer-running .mode-switch,
-  body.timer-running #timerSettings,
-  body.timer-running .info { display: none !important; }
-  body.timer-running .timer-display { color: rgba(232,240,248,0.35); }
-  body.timer-running .timer-panel button {
-    background: transparent;
-    border-color: rgba(111,168,220,0.25);
-    color: rgba(232,240,248,0.35);
+    border-radius: 50%;
+    font-size: 0.9rem;
+    line-height: 1;
+    background: rgba(15,27,43,0.9);
   }
 </style>
 </head>
 <body>
 
-<div class="mode-switch">
-  <span>Minutentakt</span>
-  <div class="switch" id="modeSwitch"></div>
-  <span>Geführt</span>
-</div>
-
-<div id="guidedPanel" class="hidden">
-  <div class="stage">
-    <div class="ring" id="maxRing"></div>
-    <div class="ring" id="minRing"></div>
-    <div class="circle" id="circle"></div>
-  </div>
-
-  <div class="phase-label" id="phaseLabel"></div>
-  <div class="sub-label" id="subLabel"></div>
-
-  <div class="controls">
-    <button id="toggleBtn">Start</button>
-    <button id="resetBtn">Reset</button>
-  </div>
-
-  <div class="counter" id="cycleCounter"></div>
-
-  <div class="settings">
-    <div class="setting-row">
-      <div class="setting-head">
-        <span>Einatmen</span>
-        <span class="setting-val"><span id="inhaleVal">4</span> s</span>
-      </div>
-      <input type="range" id="inhaleRange" min="1" max="15" step="0.5" value="4">
-    </div>
-    <div class="setting-row">
-      <div class="setting-head">
-        <span>Ausatmen</span>
-        <span class="setting-val"><span id="exhaleVal">6</span> s</span>
-      </div>
-      <input type="range" id="exhaleRange" min="1" max="20" step="0.5" value="6">
-    </div>
-  </div>
-</div>
+<button class="gear-btn" id="gearBtn" aria-label="Einstellungen">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3.2"/>
+    <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>
+  </svg>
+</button>
 
 <div id="timerPanel" class="timer-panel">
+  <div id="brainteaser" class="brainteaser hidden">
+    <div class="bt-visual" id="btVisual"></div>
+    <div class="bt-text" id="btText"></div>
+    <div class="bt-theme" id="btTheme"></div>
+  </div>
+
   <div class="timer-display" id="timerDisplay">0</div>
+
   <div class="controls">
     <button id="timerToggleBtn">Start</button>
   </div>
+</div>
 
-  <div class="settings" id="timerSettings">
+<div class="info" id="infoText">Vibriert bei jeder vollen Minute. Der Bildschirm bleibt an. Einstellungen über das Zahnrad oben rechts.</div>
+
+<!-- ---------- Einstellungsseite ---------- -->
+<div id="settingsPage" class="settings-page hidden">
+  <div class="settings-bar">
+    <button class="settings-back" id="settingsBack">‹ Zurück</button>
+    <h1>Einstellungen</h1>
+  </div>
+  <div class="settings-body">
+
     <div class="setting-row">
       <div class="setting-head">
         <span>Vibrationslänge</span>
@@ -350,44 +359,46 @@
       </div>
       <input type="range" id="vibLenRange" min="100" max="800" step="100" value="200">
     </div>
+
+    <div class="setting-row">
+      <div class="setting-head"><span>Vibrationsmuster</span></div>
+      <div class="segmented" id="vibPatternSeg">
+        <button data-val="single">Einzelimpuls</button>
+        <button data-val="double">Doppelimpuls</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-head"><span>Bildschirm</span></div>
+      <div class="segmented" id="displayModeSeg">
+        <button data-val="dark">Dunkel</button>
+        <button data-val="brainteaser">Brainteaser</button>
+      </div>
+      <div class="setting-hint">Dunkel: fast schwarzer Bildschirm mit gedimmter Minutenzahl. Brainteaser: jede Minute ein neuer Meditations-Impuls.</div>
+    </div>
+
+    <div class="setting-row hidden" id="btTypeRow">
+      <div class="setting-head"><span>Brainteaser-Art</span></div>
+      <div class="segmented" id="btTypeSeg">
+        <button data-val="text">Texte</button>
+        <button data-val="symbol">Symbole</button>
+        <button data-val="image">Eigene Bilder</button>
+      </div>
+    </div>
+
+    <div class="setting-row hidden" id="btImageRow">
+      <div class="setting-head"><span>Eigene Bilder</span></div>
+      <div class="img-list" id="imgList"></div>
+      <button id="addImgBtn">Bilder hinzufügen</button>
+      <input type="file" id="imgInput" accept="image/*" multiple hidden>
+      <div class="setting-hint">Die Bilder werden nur auf diesem Gerät gespeichert und jede Minute der Reihe nach gezeigt.</div>
+    </div>
+
   </div>
 </div>
 
-<div class="info" id="infoText"></div>
-
 <script>
-const circle = document.getElementById('circle');
-const phaseLabel = document.getElementById('phaseLabel');
-const subLabel = document.getElementById('subLabel');
-const toggleBtn = document.getElementById('toggleBtn');
-const resetBtn = document.getElementById('resetBtn');
-const cycleCounter = document.getElementById('cycleCounter');
-
-// Phasen: Dauer kommt aus der (einstellbaren) Konfiguration, die restlichen
-// Eigenschaften sind fest. Jede Phase hat ein eigenes Vibrationsmuster, damit
-// Ein- und Ausatmen ohne Blick aufs Display unterscheidbar sind.
-const MIN_SCALE = 1.0;
-const MAX_SCALE = 2.2;
-const phaseDefs = [
-  { name: 'Einatmen', key: 'inhale', scale: MAX_SCALE, sub: 'durch die Nase', vibrate: [220] },
-  { name: 'Ausatmen', key: 'exhale', scale: MIN_SCALE, sub: 'durch den Mund', vibrate: [80, 120, 80] }
-];
-
-// Einstellbare Phasenlängen (Sekunden), aus localStorage geladen.
-const STORAGE_KEY = 'atem_guided_config';
-const config = { inhale: 4, exhale: 6 };
-try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-  if (saved && typeof saved.inhale === 'number' && typeof saved.exhale === 'number') {
-    config.inhale = saved.inhale;
-    config.exhale = saved.exhale;
-  }
-} catch (err) { /* ungültige/leere Konfiguration – Defaults verwenden */ }
-
-let running = false;
-let timeoutId = null;
-let phaseIndex = 0;
-let cycleCount = 0;
+// ---------- Wake Lock (Bildschirm anhalten, damit die Vibration zuverlässig auslöst) ----------
 let wakeLock = null;
 
 async function requestWakeLock() {
@@ -396,7 +407,7 @@ async function requestWakeLock() {
       wakeLock = await navigator.wakeLock.request('screen');
     }
   } catch (err) {
-    // Wake Lock nicht verfügbar oder verweigert – Übung läuft trotzdem weiter
+    // Wake Lock nicht verfügbar oder verweigert – Takt läuft trotzdem weiter
   }
 }
 
@@ -408,203 +419,165 @@ function releaseWakeLock() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if ((running || timerRunning) && document.visibilityState === 'visible') {
+  if (timerRunning && document.visibilityState === 'visible') {
     requestWakeLock();
   }
 });
 
-function setCircleTransition(durationMs) {
-  circle.style.transition = `transform ${durationMs}ms ease-in-out, box-shadow ${durationMs}ms ease-in-out`;
-}
-
-function runPhase() {
-  if (!running) return;
-  const phase = phaseDefs[phaseIndex];
-  const duration = config[phase.key] * 1000; // Länge live aus der Konfiguration
-
-  setCircleTransition(duration);
-  circle.style.transform = `scale(${phase.scale})`;
-  circle.style.boxShadow = phase.scale > 1
-    ? `0 0 70px rgba(164,200,232,0.9)`
-    : `0 0 25px rgba(111,168,220,0.5)`;
-
-  phaseLabel.textContent = phase.name;
-  subLabel.textContent = phase.sub;
-
-  // Haptisches Signal zu Beginn jeder Phase (Ein-/Ausatmen unterscheidbar)
-  if (navigator.vibrate) {
-    navigator.vibrate(phase.vibrate);
-  }
-
-  timeoutId = setTimeout(() => {
-    if (phaseIndex === phaseDefs.length - 1) {
-      cycleCount++;
-      cycleCounter.textContent = `Zyklen: ${cycleCount}`;
-    }
-    phaseIndex = (phaseIndex + 1) % phaseDefs.length;
-    runPhase();
-  }, duration);
-}
-
-function start() {
-  running = true;
-  phaseIndex = 0;
-  document.body.classList.add('running'); // Einstellungen ausblenden, Kreis groß
-  toggleBtn.textContent = 'Pause';
-  requestWakeLock();
-  runPhase();
-}
-
-function pause() {
-  running = false;
-  clearTimeout(timeoutId);
-  document.body.classList.remove('running');
-  releaseWakeLock();
-  toggleBtn.textContent = 'Weiter';
-  phaseLabel.textContent = '';
-  subLabel.textContent = '';
-}
-
-function reset() {
-  running = false;
-  clearTimeout(timeoutId);
-  document.body.classList.remove('running');
-  releaseWakeLock();
-  phaseIndex = 0;
-  cycleCount = 0;
-  cycleCounter.textContent = '';
-  setCircleTransition(600);
-  circle.style.transform = 'scale(1)';
-  circle.style.boxShadow = '0 0 40px rgba(111,168,220,0.6)';
-  phaseLabel.textContent = '';
-  subLabel.textContent = '';
-  toggleBtn.textContent = 'Start';
-}
-
-toggleBtn.addEventListener('click', () => {
-  if (running) {
-    pause();
-  } else {
-    start();
-  }
-});
-
-resetBtn.addEventListener('click', reset);
-
-// ---------- Einstellungen: Ein-/Ausatemlänge ----------
-const inhaleRange = document.getElementById('inhaleRange');
-const exhaleRange = document.getElementById('exhaleRange');
-const inhaleVal = document.getElementById('inhaleVal');
-const exhaleVal = document.getElementById('exhaleVal');
-
-function fmtSeconds(v) {
-  // ganze Zahlen ohne Nachkommastelle, sonst eine Nachkommastelle
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
-}
-
-// Füllt die Slider-Spur bis zum Regler (sichtbarer Balken für den Wert)
-function paintRange(el) {
-  const min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
-  el.style.setProperty('--fill', `${((v - min) / (max - min)) * 100}%`);
-}
-
-function applyConfigToUI() {
-  inhaleRange.value = config.inhale;
-  exhaleRange.value = config.exhale;
-  inhaleVal.textContent = fmtSeconds(config.inhale);
-  exhaleVal.textContent = fmtSeconds(config.exhale);
-  paintRange(inhaleRange);
-  paintRange(exhaleRange);
-}
-
-function saveConfig() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  } catch (err) { /* Speicher nicht verfügbar – Einstellung gilt nur für diese Sitzung */ }
-}
-
-inhaleRange.addEventListener('input', () => {
-  config.inhale = parseFloat(inhaleRange.value);
-  inhaleVal.textContent = fmtSeconds(config.inhale);
-  paintRange(inhaleRange);
-  saveConfig();
-});
-exhaleRange.addEventListener('input', () => {
-  config.exhale = parseFloat(exhaleRange.value);
-  exhaleVal.textContent = fmtSeconds(config.exhale);
-  paintRange(exhaleRange);
-  saveConfig();
-});
-
-applyConfigToUI();
-
-// ---------- Modus-Switch ----------
-const modeSwitch = document.getElementById('modeSwitch');
-const guidedPanel = document.getElementById('guidedPanel');
-const timerPanel = document.getElementById('timerPanel');
-const infoText = document.getElementById('infoText');
-
-// Minutentakt ist der Standard (Switch links/aus); "on" schaltet auf Geführt.
-modeSwitch.addEventListener('click', () => {
-  const toGuided = !modeSwitch.classList.contains('on');
-  modeSwitch.classList.toggle('on', toGuided);
-  if (toGuided) {
-    stopTimer();
-    timerPanel.classList.add('hidden');
-    guidedPanel.classList.remove('hidden');
-    infoText.textContent = 'Folge dem Rhythmus: Vibration zu Beginn jeder Phase — ein langer Impuls fürs Einatmen, zwei kurze fürs Ausatmen. Längen unten einstellbar.';
-  } else {
-    if (running) pause();
-    guidedPanel.classList.add('hidden');
-    timerPanel.classList.remove('hidden');
-    infoText.textContent = '';
-  }
-});
-
-// ---------- Minutentakt (Zeitgefühl-Training) ----------
-// Vibriert bei jeder vollen Minute seit dem Start. Die Minuten werden aus der
-// Uhrzeit (Date.now) berechnet, nicht aus gezählten Ticks: drosselt der Browser
-// den Timer zwischendurch, stimmt der Takt beim nächsten Tick trotzdem wieder.
-// Bei gesperrtem Bildschirm läuft eine Web-App nicht zuverlässig weiter und
-// navigator.vibrate wirkt nur bei sichtbarer Seite — deshalb hält ein Screen
-// Wake Lock den Bildschirm an, und die Anzeige wird stattdessen stark
-// abgedunkelt (OLED-schonend auf dem Pixel 4).
-const timerDisplay = document.getElementById('timerDisplay');
-const timerToggleBtn = document.getElementById('timerToggleBtn');
-
-// Der Takt ist fest auf eine Minute eingestellt; einstellbar ist nur die
-// Vibrationslänge — ein einzelner Impuls zwischen 100 und 800 ms in
-// 100-ms-Schritten, kurz genug, um nicht zu stören, lang genug, um am
-// Handgelenk sicher spürbar zu sein. Die Web-Vibration-API kennt nur Dauer,
-// keine Stärke — deshalb wird die Intensität über die Länge geregelt.
+// ---------- Konfiguration ----------
+// Der Takt ist fest auf eine Minute eingestellt. Einstellbar sind Vibrationslänge
+// (100–800 ms in 100er-Schritten), das Vibrationsmuster und der Bildschirm-Modus.
+// Die Web-Vibration-API kennt nur Dauer, keine Stärke — die Intensität wird also
+// über die Länge geregelt.
 const INTERVAL_SEC = 60; // fester Minutentakt
 const VIB_MIN_MS = 100;
 const VIB_MAX_MS = 800;
 const TIMER_STORAGE_KEY = 'atem_timer_config';
-const timerConfig = { intervalSec: INTERVAL_SEC, vibrateMs: 200 };
+const IMAGES_KEY = 'atem_bt_images';
+
+const timerConfig = {
+  intervalSec: INTERVAL_SEC,
+  vibrateMs: 200,
+  vibratePattern: 'single',   // 'single' | 'double'
+  displayMode: 'dark',        // 'dark' | 'brainteaser'
+  brainteaserType: 'text'     // 'text' | 'symbol' | 'image'
+};
+
 try {
   const saved = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY));
-  if (saved && typeof saved.vibrateMs === 'number') {
-    // auf gültigen Bereich und 100-ms-Raster bringen (auch alte Werte)
-    const clamped = Math.min(VIB_MAX_MS, Math.max(VIB_MIN_MS, saved.vibrateMs));
-    timerConfig.vibrateMs = Math.round(clamped / 100) * 100;
+  if (saved) {
+    if (typeof saved.vibrateMs === 'number') {
+      const clamped = Math.min(VIB_MAX_MS, Math.max(VIB_MIN_MS, saved.vibrateMs));
+      timerConfig.vibrateMs = Math.round(clamped / 100) * 100; // auf 100-ms-Raster
+    }
+    if (saved.vibratePattern === 'single' || saved.vibratePattern === 'double') {
+      timerConfig.vibratePattern = saved.vibratePattern;
+    }
+    if (saved.displayMode === 'dark' || saved.displayMode === 'brainteaser') {
+      timerConfig.displayMode = saved.displayMode;
+    }
+    if (['text', 'symbol', 'image'].includes(saved.brainteaserType)) {
+      timerConfig.brainteaserType = saved.brainteaserType;
+    }
   }
 } catch (err) { /* ungültige/leere Konfiguration – Defaults verwenden */ }
+
+function saveTimerConfig() {
+  try {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerConfig));
+  } catch (err) { /* Speicher nicht verfügbar – Einstellung gilt nur für diese Sitzung */ }
+}
+
+function buildVibration() {
+  const ms = timerConfig.vibrateMs;
+  // Doppelimpuls: zwei spürbare Stöße mit kurzer Pause dazwischen.
+  return timerConfig.vibratePattern === 'double' ? [ms, 140, ms] : [ms];
+}
+
+// ---------- Brainteaser-Inhalte ----------
+// Meditations-Themen mit passendem Text und gezeichnetem Symbol. Der Modus
+// "Eigene Bilder" nutzt stattdessen die vom Nutzer hinzugefügten Fotos.
+const BRAINTEASERS = [
+  { theme: 'Atmung',          text: 'Spüre deinen Atem — wie er kommt und geht.',        symbol: 'breath' },
+  { theme: 'Gegenwart',       text: 'Nur dieser Augenblick ist wirklich.',              symbol: 'present' },
+  { theme: 'Vergänglichkeit', text: 'Alles verändert sich. Auch dieser Moment.',         symbol: 'leaf' },
+  { theme: 'Dankbarkeit',     text: 'Wofür bist du gerade dankbar?',                     symbol: 'heart' },
+  { theme: 'Sterblichkeit',   text: 'Die Zeit ist begrenzt. Nutze sie bewusst.',         symbol: 'hourglass' },
+  { theme: 'Loslassen',       text: 'Was darfst du jetzt loslassen?',                     symbol: 'feather' },
+  { theme: 'Fokus',           text: 'Kehre sanft zu deinem Atem zurück.',                symbol: 'target' },
+  { theme: 'Verbundenheit',   text: 'Du bist Teil von etwas Größerem.',                  symbol: 'linked' },
+  { theme: 'Stille',          text: 'Höre in die Stille zwischen den Gedanken.',         symbol: 'still' },
+  { theme: 'Annahme',         text: 'Nimm an, was ist — ohne zu bewerten.',              symbol: 'circle' }
+];
+
+const SYMBOLS = {
+  breath:    '<circle cx="50" cy="50" r="14"/><circle cx="50" cy="50" r="26" opacity="0.7"/><circle cx="50" cy="50" r="38" opacity="0.4"/>',
+  present:   '<circle cx="50" cy="50" r="34"/><circle cx="50" cy="50" r="5" fill="currentColor"/>',
+  leaf:      '<path d="M50 16 C30 32 30 66 50 84 C70 66 70 32 50 16 Z"/><path d="M50 24 L50 78"/>',
+  heart:     '<path d="M50 78 C10 50 22 24 44 34 C48 36 50 40 50 44 C50 40 52 36 56 34 C78 24 90 50 50 78 Z"/>',
+  hourglass: '<path d="M32 22 H68 L50 50 Z"/><path d="M32 78 H68 L50 50 Z"/><path d="M28 22 H72 M28 78 H72"/>',
+  feather:   '<path d="M40 74 C42 48 56 30 74 24"/><path d="M40 74 C50 70 57 62 60 54 M46 62 C54 60 60 54 63 47 M52 51 C60 49 65 44 68 38"/>',
+  target:    '<circle cx="50" cy="50" r="34" opacity="0.4"/><circle cx="50" cy="50" r="22" opacity="0.7"/><circle cx="50" cy="50" r="10"/><path d="M50 6 V18 M50 82 V94 M6 50 H18 M82 50 H94"/>',
+  linked:    '<circle cx="38" cy="50" r="24"/><circle cx="62" cy="50" r="24"/>',
+  still:     '<path d="M24 42 H76 M20 54 H80 M28 66 H72"/>',
+  circle:    '<circle cx="50" cy="50" r="34"/>'
+};
+
+function symbolSVG(key) {
+  const inner = SYMBOLS[key] || SYMBOLS.circle;
+  return '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+}
+
+// Eigene Bilder als Data-URLs im localStorage.
+function loadImages() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(IMAGES_KEY));
+    return Array.isArray(arr) ? arr : [];
+  } catch (err) { return []; }
+}
+
+function saveImages(arr) {
+  try {
+    localStorage.setItem(IMAGES_KEY, JSON.stringify(arr));
+  } catch (err) { /* Speicher voll oder nicht verfügbar */ }
+}
+
+// ---------- Minutentakt ----------
+// Vibriert bei jeder vollen Minute seit dem Start. Die Minuten werden aus der
+// Uhrzeit (Date.now) berechnet, nicht aus gezählten Ticks: drosselt der Browser
+// den Timer zwischendurch, stimmt der Takt beim nächsten Tick trotzdem wieder.
+const timerPanel = document.getElementById('timerPanel');
+const timerDisplay = document.getElementById('timerDisplay');
+const timerToggleBtn = document.getElementById('timerToggleBtn');
+const brainteaser = document.getElementById('brainteaser');
+const btVisual = document.getElementById('btVisual');
+const btText = document.getElementById('btText');
+const btTheme = document.getElementById('btTheme');
 
 let timerRunning = false;
 let timerStartTime = 0;
 let timerTicksFired = 0;
 let timerIntervalId = null;
 
+function renderBrainteaser(tick) {
+  const type = timerConfig.brainteaserType;
+
+  if (type === 'image') {
+    const imgs = loadImages();
+    if (!imgs.length) {
+      btVisual.innerHTML = '';
+      btText.textContent = 'Füge über das Zahnrad eigene Bilder hinzu.';
+      btTheme.textContent = '';
+      return;
+    }
+    const src = imgs[tick % imgs.length];
+    btVisual.innerHTML = '<img class="bt-img" src="' + src + '" alt="">';
+    btText.textContent = '';
+    btTheme.textContent = '';
+    return;
+  }
+
+  const item = BRAINTEASERS[tick % BRAINTEASERS.length];
+  if (type === 'symbol') {
+    btVisual.innerHTML = symbolSVG(item.symbol);
+    btText.textContent = '';
+    btTheme.textContent = item.theme;
+  } else { // 'text'
+    btVisual.innerHTML = '';
+    btText.textContent = item.text;
+    btTheme.textContent = item.theme;
+  }
+}
+
 function timerTick() {
   const elapsed = Date.now() - timerStartTime;
   const intervalMs = timerConfig.intervalSec * 1000;
-  // Takt aus der verstrichenen Zeit ableiten (nicht aus gezählten Ticks):
-  // drosselt der Browser den Timer, stimmt der Rhythmus beim nächsten Tick wieder.
   const ticks = Math.floor(elapsed / intervalMs);
   if (ticks > timerTicksFired) {
     timerTicksFired = ticks; // verpasste Intervalle nur einmal nachholen
-    if (navigator.vibrate) navigator.vibrate([timerConfig.vibrateMs]);
+    if (navigator.vibrate) navigator.vibrate(buildVibration());
+    if (timerConfig.displayMode === 'brainteaser') renderBrainteaser(ticks);
   }
   timerDisplay.textContent = ticks;
 }
@@ -615,6 +588,12 @@ function startTimer() {
   timerTicksFired = 0;
   timerDisplay.textContent = '0';
   document.body.classList.add('timer-running');
+
+  const bt = timerConfig.displayMode === 'brainteaser';
+  document.body.classList.toggle('bt-mode', bt);
+  brainteaser.classList.toggle('hidden', !bt);
+  if (bt) renderBrainteaser(0);
+
   timerToggleBtn.textContent = 'Stopp';
   requestWakeLock();
   if (navigator.vibrate) navigator.vibrate(80); // kurzes Startsignal
@@ -625,7 +604,8 @@ function stopTimer() {
   if (!timerRunning) return;
   timerRunning = false;
   clearInterval(timerIntervalId);
-  document.body.classList.remove('timer-running');
+  document.body.classList.remove('timer-running', 'bt-mode');
+  brainteaser.classList.add('hidden');
   releaseWakeLock();
   timerToggleBtn.textContent = 'Start';
   // Stopp setzt zugleich auf 0 zurück – ein separater Reset ist damit unnötig.
@@ -640,21 +620,21 @@ timerToggleBtn.addEventListener('click', () => {
   }
 });
 
-// ---------- Einstellungen: Vibrationslänge ----------
-// Der Takt ist fest (eine Minute); einstellbar ist nur noch die Vibrationslänge.
+// ---------- Einstellungsseite: öffnen/schließen ----------
+const gearBtn = document.getElementById('gearBtn');
+const settingsPage = document.getElementById('settingsPage');
+const settingsBack = document.getElementById('settingsBack');
+
+gearBtn.addEventListener('click', () => settingsPage.classList.remove('hidden'));
+settingsBack.addEventListener('click', () => settingsPage.classList.add('hidden'));
+
+// ---------- Einstellung: Vibrationslänge ----------
 const vibLenRange = document.getElementById('vibLenRange');
 const vibLenVal = document.getElementById('vibLenVal');
 
-function saveTimerConfig() {
-  try {
-    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerConfig));
-  } catch (err) { /* Speicher nicht verfügbar – Einstellung gilt nur für diese Sitzung */ }
-}
-
-function applyTimerConfigToUI() {
-  vibLenRange.value = timerConfig.vibrateMs;
-  vibLenVal.textContent = timerConfig.vibrateMs;
-  paintRange(vibLenRange);
+function paintRange(el) {
+  const min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
+  el.style.setProperty('--fill', ((v - min) / (max - min)) * 100 + '%');
 }
 
 vibLenRange.addEventListener('input', () => {
@@ -662,11 +642,113 @@ vibLenRange.addEventListener('input', () => {
   vibLenVal.textContent = timerConfig.vibrateMs;
   paintRange(vibLenRange);
   // kurzes Probe-Feedback beim Einstellen, damit die Länge spürbar wird
-  if (navigator.vibrate) navigator.vibrate([timerConfig.vibrateMs]);
+  if (navigator.vibrate) navigator.vibrate(buildVibration());
   saveTimerConfig();
 });
 
-applyTimerConfigToUI();
+// ---------- Segmentierte Auswahlen ----------
+function setupSegmented(id, getVal, onSelect) {
+  const seg = document.getElementById(id);
+  const buttons = seg.querySelectorAll('button');
+  function paint() {
+    buttons.forEach(b => b.classList.toggle('active', b.dataset.val === getVal()));
+  }
+  buttons.forEach(b => b.addEventListener('click', () => {
+    onSelect(b.dataset.val);
+    paint();
+  }));
+  paint();
+  return paint;
+}
+
+setupSegmented('vibPatternSeg',
+  () => timerConfig.vibratePattern,
+  (val) => {
+    timerConfig.vibratePattern = val;
+    if (navigator.vibrate) navigator.vibrate(buildVibration()); // Muster vorführen
+    saveTimerConfig();
+  });
+
+const btTypeRow = document.getElementById('btTypeRow');
+const btImageRow = document.getElementById('btImageRow');
+
+function updateBrainteaserRows() {
+  const isBt = timerConfig.displayMode === 'brainteaser';
+  btTypeRow.classList.toggle('hidden', !isBt);
+  btImageRow.classList.toggle('hidden', !(isBt && timerConfig.brainteaserType === 'image'));
+}
+
+setupSegmented('displayModeSeg',
+  () => timerConfig.displayMode,
+  (val) => {
+    timerConfig.displayMode = val;
+    updateBrainteaserRows();
+    saveTimerConfig();
+  });
+
+setupSegmented('btTypeSeg',
+  () => timerConfig.brainteaserType,
+  (val) => {
+    timerConfig.brainteaserType = val;
+    updateBrainteaserRows();
+    saveTimerConfig();
+  });
+
+// ---------- Eigene Bilder ----------
+const imgList = document.getElementById('imgList');
+const addImgBtn = document.getElementById('addImgBtn');
+const imgInput = document.getElementById('imgInput');
+
+function renderImgList() {
+  const imgs = loadImages();
+  imgList.innerHTML = '';
+  imgs.forEach((src, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'img-thumb';
+    const img = document.createElement('img');
+    img.src = src;
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Bild entfernen');
+    del.addEventListener('click', () => {
+      const arr = loadImages();
+      arr.splice(i, 1);
+      saveImages(arr);
+      renderImgList();
+    });
+    wrap.appendChild(img);
+    wrap.appendChild(del);
+    imgList.appendChild(wrap);
+  });
+}
+
+addImgBtn.addEventListener('click', () => imgInput.click());
+
+imgInput.addEventListener('change', () => {
+  const files = Array.from(imgInput.files || []);
+  let pending = files.length;
+  if (!pending) return;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const arr = loadImages();
+      arr.push(reader.result);
+      saveImages(arr);
+      if (--pending === 0) renderImgList();
+    };
+    reader.onerror = () => { if (--pending === 0) renderImgList(); };
+    reader.readAsDataURL(file);
+  });
+  imgInput.value = ''; // gleiche Datei erneut wählbar machen
+});
+
+// ---------- Einstellungen initial anzeigen ----------
+vibLenRange.value = timerConfig.vibrateMs;
+vibLenVal.textContent = timerConfig.vibrateMs;
+paintRange(vibLenRange);
+updateBrainteaserRows();
+renderImgList();
 
 // ---------- PWA: Service Worker registrieren (installierbar/offline) ----------
 if ('serviceWorker' in navigator) {
