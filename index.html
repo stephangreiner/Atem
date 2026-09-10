@@ -356,13 +356,14 @@
         <button data-val="dark">Dunkel</button>
         <button data-val="brainteaser">Brainteaser</button>
       </div>
-      <div class="setting-hint">Dunkel: fast schwarzer Bildschirm mit gedimmter Minutenzahl. Brainteaser: jede Minute ein neuer Meditations-Impuls.</div>
+      <div class="setting-hint">Dunkel: fast schwarzer Bildschirm mit gedimmter Minutenzahl. Brainteaser: jede Minute zufällig eine Frage, eine Aufgabe oder ein Symbol.</div>
     </div>
 
     <div class="setting-row hidden" id="btTypeRow">
       <div class="setting-head"><span>Brainteaser-Art</span></div>
       <div class="segmented" id="btTypeSeg">
-        <button data-val="text">Texte</button>
+        <button data-val="fragen">Fragen</button>
+        <button data-val="aufgabe">Aufgabe</button>
         <button data-val="symbol">Symbole</button>
       </div>
     </div>
@@ -414,8 +415,11 @@ const timerConfig = {
   vibrateMs: 200,
   vibratePattern: 'single',   // 'single' | 'double'
   displayMode: 'dark',        // 'dark' | 'brainteaser'
-  brainteaserType: 'text'     // 'text' | 'symbol'
+  brainteaserType: 'fragen'   // 'fragen' | 'aufgabe' | 'symbol'
 };
+
+// Namen der Brainteaser-Arten (auch für die Migration alter gespeicherter Werte).
+const BT_TYPES = ['fragen', 'aufgabe', 'symbol'];
 
 try {
   const saved = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY));
@@ -430,7 +434,10 @@ try {
     if (saved.displayMode === 'dark' || saved.displayMode === 'brainteaser') {
       timerConfig.displayMode = saved.displayMode;
     }
-    if (saved.brainteaserType === 'text' || saved.brainteaserType === 'symbol') {
+    // Alte Werte migrieren: 'text' (früher: Texte) → 'fragen'.
+    if (saved.brainteaserType === 'text') {
+      timerConfig.brainteaserType = 'fragen';
+    } else if (BT_TYPES.includes(saved.brainteaserType)) {
       timerConfig.brainteaserType = saved.brainteaserType;
     }
   }
@@ -449,38 +456,86 @@ function buildVibration() {
 }
 
 // ---------- Brainteaser-Inhalte ----------
-// Meditations-Themen mit passendem Text und gezeichnetem Symbol.
-const BRAINTEASERS = [
-  { theme: 'Atmung',          text: 'Spüre deinen Atem — wie er kommt und geht.',        symbol: 'breath' },
-  { theme: 'Gegenwart',       text: 'Nur dieser Augenblick ist wirklich.',              symbol: 'present' },
-  { theme: 'Vergänglichkeit', text: 'Alles verändert sich. Auch dieser Moment.',         symbol: 'leaf' },
-  { theme: 'Dankbarkeit',     text: 'Wofür bist du gerade dankbar?',                     symbol: 'heart' },
-  { theme: 'Sterblichkeit',   text: 'Die Zeit ist begrenzt. Nutze sie bewusst.',         symbol: 'hourglass' },
-  { theme: 'Loslassen',       text: 'Was darfst du jetzt loslassen?',                     symbol: 'feather' },
-  { theme: 'Fokus',           text: 'Kehre sanft zu deinem Atem zurück.',                symbol: 'target' },
-  { theme: 'Verbundenheit',   text: 'Du bist Teil von etwas Größerem.',                  symbol: 'linked' },
-  { theme: 'Stille',          text: 'Höre in die Stille zwischen den Gedanken.',         symbol: 'still' },
-  { theme: 'Annahme',         text: 'Nimm an, was ist — ohne zu bewerten.',              symbol: 'circle' }
+// Drei Arten, zwischen denen jede Minute zufällig gewechselt wird:
+//   'fragen'  – eine der 51 Meditations-Fragen
+//   'aufgabe' – eine der Meditations-Aufgaben
+//   'symbol'  – ein Symbol mit Unterschrift
+
+// Fragenpool zur Meditation (51 Fragen).
+const QUESTIONS = [
+  'Wovor würde ich mich schämen, wenn andere es wüssten – und was sagt das über mich?',
+  'Welchen Teil von mir habe ich als Kind unterdrückt, um geliebt zu werden?',
+  'Wofür belohne oder bestrafe ich mich selbst, ohne es zu merken?',
+  'Was würde ich tun, wenn niemand je davon erführe?',
+  'Welche Wahrheit über mich vermeide ich, weil sie zu viel verändern würde?',
+  'Auf welche äußere Anerkennung bin ich konditioniert, obwohl sie mir nicht mehr dient?',
+  'Was fürchte ich mehr – zu scheitern oder gesehen zu werden?',
+  'Welchem Muster aus meiner Kindheit folge ich, ohne es zu bemerken?',
+  'Wenn ich heute stürbe, wofür würde ich in Erinnerung bleiben wollen – und stimmt das mit meinem jetzigen Tun überein?',
+  'Welche Konsequenz eines Verhaltens hält mich unbewusst davon ab, es zu ändern?',
+  'Wenn niemand mich mehr bewerten würde, wer wäre ich dann?',
+  'Wessen Stimme höre ich, wenn ich mich selbst kritisiere?',
+  'Was würde ich heute tun, wenn ich wirklich glaubte, dass mein Leben endlich ist?',
+  'Wenn ich mein Leben als fremdes Schicksal betrachten würde, was würde ich diesem Menschen raten?',
+  'Welchen Teil meiner Geschichte verdränge ich, weil er nicht zu meinem Selbstbild passt?',
+  'Was würde ich anders sehen, wenn ich meine eigene Sterblichkeit wirklich annähme?',
+  'Welchem Urteil über mich selbst glaube ich, ohne es je geprüft zu haben?',
+  'Was würde ich bereuen, wenn ich mein bisheriges Leben heute Abend abschließen müsste?',
+  'Welche Anerkennung, die ich mir selbst schuldig bin, hole ich mir bei anderen?',
+  'Was in meinem Leben ist vergänglich, und wie gehe ich damit um, als wäre es dauerhaft?',
+  'Welcher Teil meiner Persönlichkeit ist eine Reaktion auf frühen Schmerz statt eine echte Wahl?',
+  'Was mache ich aus reiner Vermeidung von Unbehagen, nicht aus echtem Wunsch?',
+  'Wenn ich nur noch ein Jahr zu leben hätte, was würde ich sofort beenden?',
+  'Welche Konditionierung aus meinem Berufsalltag übertrage ich unbemerkt auf mein Privatleben?',
+  'Welchen Teil meiner Identität habe ich mir angeeignet, um nicht aufzufallen?',
+  'Welche Erinnerung kehrt immer wieder zurück – und was will sie mir zeigen?',
+  'Was bin ich bereit aufzugeben, um authentisch zu leben statt bequem?',
+  'Welchen Teil meines Lebens lebe ich für ein Publikum, das gar nicht zuschaut?',
+  'Welche kleine Geste würde ich heute jemandem gegenüber wagen, wenn ich Ablehnung nicht fürchten müsste?',
+  'Wo ziehe ich aus Angst vor Schmerz eine Grenze, wo eigentlich Wachstum wäre?',
+  'Welche Trauer trage ich mit mir herum, ohne ihr je Raum gegeben zu haben?',
+  'Welche Reaktion habe ich mir antrainiert, um Konflikte zu vermeiden – um welchen Preis?',
+  'Welche Belohnung suche ich in der Anerkennung anderer, die ich mir selbst geben könnte?',
+  'Wie reagiere ich typischerweise, wenn mir jemand nahekommt – und woher kenne ich dieses Muster?',
+  'Welches Gefühl kann ich am schwersten bei anderen aushalten – und was sagt das über meines?',
+  'Was passiert in mir kurz bevor ich mich zurückziehe – und wovor schützt mich das?',
+  'Wessen Bedürfnisse stelle ich reflexhaft über meine eigenen – und seit wann?',
+  'Welches Vermeidungsverhalten hält kurzfristig Erleichterung bereit, aber langfristig ein Problem am Leben?',
+  'Welches Verhalten habe ich mir angewöhnt, weil es früher einmal funktioniert hat, auch wenn es das heute nicht mehr tut?',
+  'Was würde ich tun, wenn ich sicher wäre, nicht zu scheitern?',
+  'Welche meiner Reaktionen ist eigentlich die eines verletzten Kindes, nicht die eines Erwachsenen?',
+  'Was würde ein Leben ohne die Angst vor dem Urteil anderer für mich möglich machen?',
+  'Welche Wunde in mir wird immer wieder von denselben Situationen berührt?',
+  'Welche Rolle nehme ich in Konflikten fast automatisch ein – Angreifer, Opfer oder Retter?',
+  'Welches Verhalten bei mir ist ein Schutzschild – und wovor genau schützt es?',
+  'Welchen Satz habe ich als Kind über mich gehört, den ich bis heute für wahr halte?',
+  'Was würde ich heute wagen, wenn Scham nicht mein Kompass wäre?',
+  'Bin ich für mein Leben verantwortlich, oder schiebe ich diese Last lieber weiter?',
+  'Welchen Traum erinnere ich immer wieder – und was, wenn er von mir spricht, nicht zu mir?',
+  'Welche Scham aus meiner Kindheit bestimmt heute noch, wie viel Raum ich mir selbst zugestehe?',
+  'Für was bist du in deinem Leben dankbar?'
 ];
 
-const SYMBOLS = {
-  breath:    '<circle cx="50" cy="50" r="14"/><circle cx="50" cy="50" r="26" opacity="0.7"/><circle cx="50" cy="50" r="38" opacity="0.4"/>',
-  present:   '<circle cx="50" cy="50" r="34"/><circle cx="50" cy="50" r="5" fill="currentColor"/>',
-  leaf:      '<path d="M50 16 C30 32 30 66 50 84 C70 66 70 32 50 16 Z"/><path d="M50 24 L50 78"/>',
-  heart:     '<path d="M50 78 C10 50 22 24 44 34 C48 36 50 40 50 44 C50 40 52 36 56 34 C78 24 90 50 50 78 Z"/>',
-  hourglass: '<path d="M32 22 H68 L50 50 Z"/><path d="M32 78 H68 L50 50 Z"/><path d="M28 22 H72 M28 78 H72"/>',
-  feather:   '<path d="M40 74 C42 48 56 30 74 24"/><path d="M40 74 C50 70 57 62 60 54 M46 62 C54 60 60 54 63 47 M52 51 C60 49 65 44 68 38"/>',
-  target:    '<circle cx="50" cy="50" r="34" opacity="0.4"/><circle cx="50" cy="50" r="22" opacity="0.7"/><circle cx="50" cy="50" r="10"/><path d="M50 6 V18 M50 82 V94 M6 50 H18 M82 50 H94"/>',
-  linked:    '<circle cx="38" cy="50" r="24"/><circle cx="62" cy="50" r="24"/>',
-  still:     '<path d="M24 42 H76 M20 54 H80 M28 66 H72"/>',
-  circle:    '<circle cx="50" cy="50" r="34"/>'
-};
+// Aufgabenliste zur Meditation.
+const TASKS = [
+  'Stelle dir vor, du stehst eine Minute vor deinem Tod. Dein Aussehen, der Raum, die Menschen im Raum.',
+  'Stell dir vor, du sitzt als alter Mensch auf einer Bank und blickst auf dein ganzes Leben zurück. Was siehst du zuerst?',
+  'Stell dir vor, du hältst eine Rede auf deiner eigenen Beerdigung. Was sagst du über das Leben, das du geführt hast?',
+  'Stell dir vor, du beobachtest dich selbst wie ein Verhaltensforscher einen Tag lang. Welches Verhalten würde dir auffallen?',
+  'Stell dir vor, du siehst dir eine Aufnahme deiner eigenen letzten Auseinandersetzung von außen an, wie ein Therapeut. Was würdest du bemerken?',
+  'Welche dir nahestehende Person ist zuletzt gestorben? Was ist das Letzte, das du zu ihr gesagt hast?',
+  'Wie soll dein Leben in drei Jahren aussehen?'
+];
 
-function symbolSVG(key) {
-  const inner = SYMBOLS[key] || SYMBOLS.circle;
-  return '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" '
-    + 'stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
-}
+// Symbole mit Unterschrift. Die Unterschrift entspricht dem Dateinamen der
+// gelieferten Symbol-Dateien (z. B. dankbarkeit.svg → „Dankbarkeit").
+const SYMBOL_ITEMS = [
+  { caption: 'Dankbarkeit', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Herz aus verschlungenen Ästen</title><desc>Ein Herz, geformt aus zwei sich umarmenden Ästen, Symbol für Verbundenheit und Dank</desc><rect x="0" y="0" width="200" height="200" fill="#FBEAF0" rx="12"/><path d="M100 150 Q50 110 60 75 Q68 50 100 65 Q132 50 140 75 Q150 110 100 150 Z" fill="none" stroke="#993556" stroke-width="4"/><circle cx="80" cy="80" r="3" fill="#639922"/><circle cx="122" cy="85" r="3" fill="#639922"/></svg>` },
+  { caption: 'Aufmerksamkeit', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Auge</title><desc>Ein offenes Auge, Symbol für Beobachtung und Bewusstsein</desc><rect x="0" y="0" width="200" height="200" fill="#F1EFE8" rx="12"/><path d="M40 100 Q100 55 160 100 Q100 145 40 100 Z" fill="none" stroke="#5F5E5A" stroke-width="3"/><circle cx="100" cy="100" r="20" fill="#7F77DD"/><circle cx="100" cy="100" r="9" fill="#F1EFE8"/></svg>` },
+  { caption: 'Mitmenschen', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Zwei Gesichter im Profil</title><desc>Zwei einander zugewandte Profile, Symbol für inneren Dialog</desc><rect x="0" y="0" width="200" height="200" fill="#EEEDFE" rx="12"/><path d="M60 60 Q40 80 45 110 Q48 140 70 155 L70 60 Z" fill="#7F77DD"/><path d="M140 60 Q160 80 155 110 Q152 140 130 155 L130 60 Z" fill="#AFA9EC"/><circle cx="63" cy="95" r="3" fill="#26215C"/><circle cx="137" cy="95" r="3" fill="#3C3489"/></svg>` },
+  { caption: 'Tod', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Stilisierter Schädel</title><desc>Ein schlicht stilisierter Schädel im Memento-mori-Stil</desc><rect x="0" y="0" width="200" height="200" fill="#2C2C2A" rx="12"/><ellipse cx="100" cy="90" rx="45" ry="42" fill="#F1EFE8"/><path d="M65 110 Q100 140 135 110 L128 150 L72 150 Z" fill="#F1EFE8"/><circle cx="82" cy="88" r="12" fill="#2C2C2A"/><circle cx="118" cy="88" r="12" fill="#2C2C2A"/><path d="M100 100 L94 118 H106 Z" fill="#2C2C2A"/><path d="M80 138 H120" stroke="#2C2C2A" stroke-width="2"/></svg>` },
+  { caption: 'Ziel', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Segelschiff im Sturm</title><desc>Ein antikes Segelschiff kämpft gegen hohe Wellen</desc><rect x="0" y="0" width="200" height="200" fill="#5F5E5A" rx="12"/><path d="M0 60 Q60 40 120 60 T200 55" fill="none" stroke="#2C2C2A" stroke-width="2" opacity="0.6"/><path d="M0 140 Q40 110 80 140 T160 135 T200 145" fill="#0F6E56" opacity="0.8"/><path d="M0 165 Q40 135 80 165 T160 160 T200 168" fill="#085041"/><path d="M100 145 V70" stroke="#26215C" stroke-width="3" transform="rotate(-8 100 145)"/><path d="M102 75 L135 100 L102 118 Z" fill="#26215C" transform="rotate(-8 100 145)"/><path d="M70 145 L130 145 L118 160 L82 160 Z" fill="#26215C"/></svg>` }
+];
 
 // ---------- Minutentakt ----------
 // Vibriert bei jeder vollen Minute seit dem Start. Die Minuten werden aus der
@@ -499,17 +554,34 @@ let timerStartTime = 0;
 let timerTicksFired = 0;
 let timerIntervalId = null;
 
-function renderBrainteaser(tick) {
+// Zufälligen Index aus einer Liste ziehen, aber nie denselben wie zuletzt
+// (bei nur einem Eintrag bleibt es bei diesem).
+const lastPickIndex = { fragen: -1, aufgabe: -1, symbol: -1 };
+function pickRandomIndex(type, length) {
+  if (length <= 1) return 0;
+  let idx;
+  do {
+    idx = Math.floor(Math.random() * length);
+  } while (idx === lastPickIndex[type]);
+  lastPickIndex[type] = idx;
+  return idx;
+}
+
+function renderBrainteaser() {
   const type = timerConfig.brainteaserType;
-  const item = BRAINTEASERS[tick % BRAINTEASERS.length];
   if (type === 'symbol') {
-    btVisual.innerHTML = symbolSVG(item.symbol);
+    const item = SYMBOL_ITEMS[pickRandomIndex('symbol', SYMBOL_ITEMS.length)];
+    btVisual.innerHTML = item.svg;
     btText.textContent = '';
-    btTheme.textContent = item.theme;
-  } else { // 'text'
+    btTheme.textContent = item.caption;
+  } else if (type === 'aufgabe') {
     btVisual.innerHTML = '';
-    btText.textContent = item.text;
-    btTheme.textContent = item.theme;
+    btText.textContent = TASKS[pickRandomIndex('aufgabe', TASKS.length)];
+    btTheme.textContent = 'Aufgabe';
+  } else { // 'fragen'
+    btVisual.innerHTML = '';
+    btText.textContent = QUESTIONS[pickRandomIndex('fragen', QUESTIONS.length)];
+    btTheme.textContent = 'Frage';
   }
 }
 
@@ -520,7 +592,7 @@ function timerTick() {
   if (ticks > timerTicksFired) {
     timerTicksFired = ticks; // verpasste Intervalle nur einmal nachholen
     if (navigator.vibrate) navigator.vibrate(buildVibration());
-    if (timerConfig.displayMode === 'brainteaser') renderBrainteaser(ticks);
+    if (timerConfig.displayMode === 'brainteaser') renderBrainteaser();
   }
   timerDisplay.textContent = ticks;
 }
@@ -535,7 +607,7 @@ function startTimer() {
   const bt = timerConfig.displayMode === 'brainteaser';
   document.body.classList.toggle('bt-mode', bt);
   brainteaser.classList.toggle('hidden', !bt);
-  if (bt) renderBrainteaser(0);
+  if (bt) renderBrainteaser();
 
   timerToggleBtn.textContent = 'Stopp';
   requestWakeLock();
