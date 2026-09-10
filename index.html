@@ -529,38 +529,13 @@ const TASKS = [
 
 // Symbole mit Unterschrift. Die Unterschrift entspricht dem Dateinamen der
 // gelieferten Symbol-Dateien (z. B. dankbarkeit.svg → „Dankbarkeit").
-// Solange keine eigenen Bilder vorliegen, werden die vorhandenen Zeichnungen genutzt.
 const SYMBOL_ITEMS = [
-  { caption: 'Atmung',          symbol: 'breath' },
-  { caption: 'Gegenwart',       symbol: 'present' },
-  { caption: 'Vergänglichkeit', symbol: 'leaf' },
-  { caption: 'Dankbarkeit',     symbol: 'heart' },
-  { caption: 'Sterblichkeit',   symbol: 'hourglass' },
-  { caption: 'Loslassen',       symbol: 'feather' },
-  { caption: 'Fokus',           symbol: 'target' },
-  { caption: 'Verbundenheit',   symbol: 'linked' },
-  { caption: 'Stille',          symbol: 'still' },
-  { caption: 'Annahme',         symbol: 'circle' }
+  { caption: 'Dankbarkeit', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Herz aus verschlungenen Ästen</title><desc>Ein Herz, geformt aus zwei sich umarmenden Ästen, Symbol für Verbundenheit und Dank</desc><rect x="0" y="0" width="200" height="200" fill="#FBEAF0" rx="12"/><path d="M100 150 Q50 110 60 75 Q68 50 100 65 Q132 50 140 75 Q150 110 100 150 Z" fill="none" stroke="#993556" stroke-width="4"/><circle cx="80" cy="80" r="3" fill="#639922"/><circle cx="122" cy="85" r="3" fill="#639922"/></svg>` },
+  { caption: 'Aufmerksamkeit', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Auge</title><desc>Ein offenes Auge, Symbol für Beobachtung und Bewusstsein</desc><rect x="0" y="0" width="200" height="200" fill="#F1EFE8" rx="12"/><path d="M40 100 Q100 55 160 100 Q100 145 40 100 Z" fill="none" stroke="#5F5E5A" stroke-width="3"/><circle cx="100" cy="100" r="20" fill="#7F77DD"/><circle cx="100" cy="100" r="9" fill="#F1EFE8"/></svg>` },
+  { caption: 'Mitmenschen', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Zwei Gesichter im Profil</title><desc>Zwei einander zugewandte Profile, Symbol für inneren Dialog</desc><rect x="0" y="0" width="200" height="200" fill="#EEEDFE" rx="12"/><path d="M60 60 Q40 80 45 110 Q48 140 70 155 L70 60 Z" fill="#7F77DD"/><path d="M140 60 Q160 80 155 110 Q152 140 130 155 L130 60 Z" fill="#AFA9EC"/><circle cx="63" cy="95" r="3" fill="#26215C"/><circle cx="137" cy="95" r="3" fill="#3C3489"/></svg>` },
+  { caption: 'Tod', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Stilisierter Schädel</title><desc>Ein schlicht stilisierter Schädel im Memento-mori-Stil</desc><rect x="0" y="0" width="200" height="200" fill="#2C2C2A" rx="12"/><ellipse cx="100" cy="90" rx="45" ry="42" fill="#F1EFE8"/><path d="M65 110 Q100 140 135 110 L128 150 L72 150 Z" fill="#F1EFE8"/><circle cx="82" cy="88" r="12" fill="#2C2C2A"/><circle cx="118" cy="88" r="12" fill="#2C2C2A"/><path d="M100 100 L94 118 H106 Z" fill="#2C2C2A"/><path d="M80 138 H120" stroke="#2C2C2A" stroke-width="2"/></svg>` },
+  { caption: 'Ziel', svg: `<svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img"><title>Segelschiff im Sturm</title><desc>Ein antikes Segelschiff kämpft gegen hohe Wellen</desc><rect x="0" y="0" width="200" height="200" fill="#5F5E5A" rx="12"/><path d="M0 60 Q60 40 120 60 T200 55" fill="none" stroke="#2C2C2A" stroke-width="2" opacity="0.6"/><path d="M0 140 Q40 110 80 140 T160 135 T200 145" fill="#0F6E56" opacity="0.8"/><path d="M0 165 Q40 135 80 165 T160 160 T200 168" fill="#085041"/><path d="M100 145 V70" stroke="#26215C" stroke-width="3" transform="rotate(-8 100 145)"/><path d="M102 75 L135 100 L102 118 Z" fill="#26215C" transform="rotate(-8 100 145)"/><path d="M70 145 L130 145 L118 160 L82 160 Z" fill="#26215C"/></svg>` }
 ];
-
-const SYMBOLS = {
-  breath:    '<circle cx="50" cy="50" r="14"/><circle cx="50" cy="50" r="26" opacity="0.7"/><circle cx="50" cy="50" r="38" opacity="0.4"/>',
-  present:   '<circle cx="50" cy="50" r="34"/><circle cx="50" cy="50" r="5" fill="currentColor"/>',
-  leaf:      '<path d="M50 16 C30 32 30 66 50 84 C70 66 70 32 50 16 Z"/><path d="M50 24 L50 78"/>',
-  heart:     '<path d="M50 78 C10 50 22 24 44 34 C48 36 50 40 50 44 C50 40 52 36 56 34 C78 24 90 50 50 78 Z"/>',
-  hourglass: '<path d="M32 22 H68 L50 50 Z"/><path d="M32 78 H68 L50 50 Z"/><path d="M28 22 H72 M28 78 H72"/>',
-  feather:   '<path d="M40 74 C42 48 56 30 74 24"/><path d="M40 74 C50 70 57 62 60 54 M46 62 C54 60 60 54 63 47 M52 51 C60 49 65 44 68 38"/>',
-  target:    '<circle cx="50" cy="50" r="34" opacity="0.4"/><circle cx="50" cy="50" r="22" opacity="0.7"/><circle cx="50" cy="50" r="10"/><path d="M50 6 V18 M50 82 V94 M6 50 H18 M82 50 H94"/>',
-  linked:    '<circle cx="38" cy="50" r="24"/><circle cx="62" cy="50" r="24"/>',
-  still:     '<path d="M24 42 H76 M20 54 H80 M28 66 H72"/>',
-  circle:    '<circle cx="50" cy="50" r="34"/>'
-};
-
-function symbolSVG(key) {
-  const inner = SYMBOLS[key] || SYMBOLS.circle;
-  return '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" '
-    + 'stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
-}
 
 // ---------- Minutentakt ----------
 // Vibriert bei jeder vollen Minute seit dem Start. Die Minuten werden aus der
@@ -596,7 +571,7 @@ function renderBrainteaser() {
   const type = timerConfig.brainteaserType;
   if (type === 'symbol') {
     const item = SYMBOL_ITEMS[pickRandomIndex('symbol', SYMBOL_ITEMS.length)];
-    btVisual.innerHTML = symbolSVG(item.symbol);
+    btVisual.innerHTML = item.svg;
     btText.textContent = '';
     btTheme.textContent = item.caption;
   } else if (type === 'aufgabe') {
